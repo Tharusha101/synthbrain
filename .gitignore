@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Generated plots (keep the folder, ignore its contents except curated samples).
+outputs/*
+!outputs/.gitkeep
+!outputs/samples/
+
+# Cached datasets
+.synthbrain/
+*.npz
+MNIST/

@@ -1,0 +1,9 @@
+# Core (required) — the from-scratch SNN runs on these alone.
+numpy>=1.24
+matplotlib>=3.7
+
+# Optional — only used by encoding.load_mnist() to fetch real MNIST.
+# Install one of these for the MNIST demo; otherwise demo_network.py falls back
+# to synthetic digits and runs fully offline.
+# torchvision>=0.15
+# scikit-learn>=1.3
