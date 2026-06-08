@@ -47,9 +47,15 @@ class Network:
         w_max: float = 1.0,
         tau_syn: float = 5.0,
         norm_target: float = 90.0,
-        # lateral inhibition
-        w_inh: float = 0.6,
+        # inhibition: "lateral" = direct exc->exc negative coupling (default,
+        # an approximation); "two_layer" = explicit inhibitory population wired
+        # exc_i->inh_i (1:1) and inh_i->exc_{j!=i}, i.e. true Diehl & Cook 2015.
+        inhibition: str = "lateral",
+        w_inh: float = 0.6,        # inh->exc magnitude (both modes)
         tau_inh: float = 8.0,
+        w_exc_inh: float = 40.0,   # exc_i->inh_i drive (two_layer); strong enough
+                                   # that one exc spike makes its inh partner fire
+        r_m_inh: float = 6.0,      # inhibitory-neuron excitability (two_layer)
         # excitatory neuron excitability + homeostasis
         r_m: float = 6.0,
         theta_plus: float = 0.05,
@@ -65,6 +71,7 @@ class Network:
         self.input_norm_power = input_norm_power
         self.dt = dt
         self.norm_target = norm_target
+        self.inhibition = inhibition
         self.rng = rng or np.random.default_rng()
 
         # Plastic feedforward synapses (input -> excitatory).
@@ -74,8 +81,25 @@ class Network:
         )
         self.exc_syn.normalize(norm_target)
 
-        # Lateral inhibition within the excitatory layer.
-        self.inh_syn = Synapses.lateral_inhibition(n_exc, w_inh=w_inh, tau_syn=tau_inh, dt=dt)
+        # Inhibition within the excitatory layer.
+        if inhibition == "lateral":
+            # Direct exc->exc negative coupling (winner-take-all approximation).
+            self.inh_syn = Synapses.lateral_inhibition(
+                n_exc, w_inh=w_inh, tau_syn=tau_inh, dt=dt)
+        elif inhibition == "two_layer":
+            # Explicit inhibitory population (one inh neuron per exc neuron).
+            # exc_i -> inh_i, one-to-one fixed excitatory (diagonal weights).
+            self.exc_to_inh_syn = Synapses(
+                n_exc, n_exc, w=w_exc_inh * np.eye(n_exc), tau_syn=tau_syn, dt=dt)
+            # inh_i -> exc_{j!=i}, fixed inhibitory (off-diagonal negative).
+            self.inh_to_exc_syn = Synapses.lateral_inhibition(
+                n_exc, w_inh=w_inh, tau_syn=tau_inh, dt=dt)
+            # Inhibitory neurons: plain LIF, no threshold adaptation, fast relay.
+            self.inh = LIFGroup(
+                n_exc, dt=dt, r_m=r_m_inh, theta_plus=0.0, rng=self.rng)
+        else:
+            raise ValueError(
+                f"inhibition must be 'lateral' or 'two_layer', got {inhibition!r}")
 
         # Excitatory neurons with an adaptive threshold. r_m sets excitability:
         # the feedforward weight budget is kept modest (for STDP contrast), so a
@@ -107,8 +131,31 @@ class Network:
         self.exc.reset_state()
         self.exc.theta[:] = theta
         self.exc_syn.reset_state()
-        self.inh_syn.reset_state()
+        if self.inhibition == "two_layer":
+            self.inh.reset_state()
+            self.exc_to_inh_syn.reset_state()
+            self.inh_to_exc_syn.reset_state()
+        else:
+            self.inh_syn.reset_state()
         self.stdp.reset_state()
+
+    def _step_once(self, in_spikes_t: np.ndarray, prev: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Advance the network one timestep.
+
+        `prev` is the previous step's inhibitory drive applied to the exc layer:
+        prev_exc spikes for 'lateral', prev_inh spikes for 'two_layer'. Both modes
+        therefore apply inhibition with a one-step delay. Returns
+        (exc_spikes, new_prev) where new_prev feeds the next step.
+        """
+        in_current = self.exc_syn.step(in_spikes_t)
+        if self.inhibition == "two_layer":
+            inh_current = self.inh_to_exc_syn.step(prev)          # prev = prev_inh
+            exc_spikes = self.exc.step(in_current + inh_current)
+            inh_spikes = self.inh.step(self.exc_to_inh_syn.step(exc_spikes))
+            return exc_spikes, inh_spikes
+        inh_current = self.inh_syn.step(prev)                     # prev = prev_exc
+        exc_spikes = self.exc.step(in_current + inh_current)
+        return exc_spikes, exc_spikes
 
     def _eff_max_rate(self, image: np.ndarray, max_rate: float) -> float:
         """Per-image input gain: scale the firing rate so every digit delivers a
@@ -142,17 +189,14 @@ class Network:
         input_spikes = poisson_encode(image, T, dt=self.dt, max_rate=max_rate, rng=self.rng)
 
         counts = np.zeros(self.n_exc, dtype=np.int64)
-        prev_exc = np.zeros(self.n_exc, dtype=bool)
+        prev = np.zeros(self.n_exc, dtype=bool)
         for ti in range(T):
-            in_current = self.exc_syn.step(input_spikes[ti])     # excitatory drive
-            inh_current = self.inh_syn.step(prev_exc)            # negative (inhibitory)
-            exc_spikes = self.exc.step(in_current + inh_current)
+            exc_spikes, prev = self._step_once(input_spikes[ti], prev)
 
             if train:
                 self.stdp.step(self.exc_syn.W, input_spikes[ti], exc_spikes)
 
             counts += exc_spikes
-            prev_exc = exc_spikes
 
         if train:
             self.exc_syn.normalize(self.norm_target)
@@ -166,21 +210,26 @@ class Network:
             input_spikes (T, n_input) bool   — Poisson input layer
             exc_spikes   (T, n_exc)   bool   — excitatory layer spikes
             v_trace      (T, n_exc)   float  — excitatory membrane potentials
+            inh_spikes   (T, n_exc)   bool   — inhibitory layer (two_layer mode only)
         """
         max_rate = self._eff_max_rate(image, max_rate)
         input_spikes = poisson_encode(image, T, dt=self.dt, max_rate=max_rate, rng=self.rng)
         exc_spikes = np.zeros((T, self.n_exc), dtype=bool)
         v_trace = np.zeros((T, self.n_exc), dtype=np.float64)
-        prev_exc = np.zeros(self.n_exc, dtype=bool)
+        two_layer = self.inhibition == "two_layer"
+        inh_spikes = np.zeros((T, self.n_exc), dtype=bool) if two_layer else None
+        prev = np.zeros(self.n_exc, dtype=bool)
         for ti in range(T):
-            in_current = self.exc_syn.step(input_spikes[ti])
-            inh_current = self.inh_syn.step(prev_exc)
-            s = self.exc.step(in_current + inh_current)
+            s, prev = self._step_once(input_spikes[ti], prev)
             exc_spikes[ti] = s
             v_trace[ti] = self.exc.v
-            prev_exc = s
+            if two_layer:
+                inh_spikes[ti] = prev   # in two_layer, _step_once returns inh spikes
         self._reset_between_images()
-        return {"input_spikes": input_spikes, "exc_spikes": exc_spikes, "v_trace": v_trace}
+        out = {"input_spikes": input_spikes, "exc_spikes": exc_spikes, "v_trace": v_trace}
+        if two_layer:
+            out["inh_spikes"] = inh_spikes
+        return out
 
     def run_record(self, image: np.ndarray, T: int = 350, max_rate: float = 63.75) -> np.ndarray:
         """Present one image without learning; return just the (T, n_exc) spike trace."""

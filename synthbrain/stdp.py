@@ -64,14 +64,29 @@ class STDP:
 
         # 2. Weight changes from this step's spikes, using the decayed traces
         #    (i.e. the partner's most recent activity).
-        if pre_spikes.any():                       # LTD: post fired before this pre
+        pre_any = pre_spikes.any()
+        post_any = post_spikes.any()
+        if pre_any:                                # LTD: post fired before this pre
             W[pre_spikes] -= self.a_minus * self.x_post[None, :]
-        if post_spikes.any():                      # LTP: pre fired before this post
+        if post_any:                               # LTP: pre fired before this post
             W[:, post_spikes] += self.a_plus * self.x_pre[:, None]
 
         # 3. Register this step's spikes in the traces (for future pairings).
         self.x_pre[pre_spikes] += 1.0
         self.x_post[post_spikes] += 1.0
 
-        np.clip(W, self.w_min, self.w_max, out=W)
+        # 4. Clip back to [w_min, w_max]. Only the rows touched by pre spikes and
+        #    columns touched by post spikes can have left the range this step; every
+        #    other entry was already in range from a previous step. Clipping just
+        #    those slices is identical to clipping all of W (clip is idempotent and
+        #    both LTD/LTP deltas are applied before any clip) but touches a tiny
+        #    fraction of the matrix -- the old full-matrix clip was ~55% of training.
+        if pre_any:
+            r = W[pre_spikes]
+            np.clip(r, self.w_min, self.w_max, out=r)
+            W[pre_spikes] = r
+        if post_any:
+            c = W[:, post_spikes]
+            np.clip(c, self.w_min, self.w_max, out=c)
+            W[:, post_spikes] = c
         return W

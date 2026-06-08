@@ -38,6 +38,18 @@ T = 350                     # ms per image (the Network default; > the 150 demo)
 # Soften per-image input gain (1.0 = full normalization). <1 stops thin digits
 # like '1' from over-firing and monopolizing the excitatory layer.
 INPUT_NORM_POWER = 0.5
+# Inhibition: "lateral" = direct exc->exc approximation (default; best accuracy
+# here), "two_layer" = explicit inhibitory population (more biologically faithful,
+# true Diehl & Cook). W_INH is the inh->exc strength: ~0.6 for lateral, ~0.35 for
+# two_layer (the value that matches lateral's competition; see below).
+# FINDING (two_layer experiment): the explicit inhibitory layer does NOT beat the
+# lateral approximation at this data scale. Competition-matched (w_inh=0.35,
+# top-10 share ~0.33) it scored 60.3% vs 66.4% for lateral, with no cleaner
+# receptive fields. And it must be tuned for competition COMPARABLE to lateral,
+# not the sharpest winner-take-all: w_inh=3.0 (top-10=0.95, only ~10/400 neurons
+# ever win) starved STDP and cratered to 29%. See scripts/_check_inhibition.py.
+INHIBITION = "lateral"
+W_INH = 0.6
 
 
 def get_data(rng):
@@ -111,9 +123,10 @@ def main():
 
     print(f"[scaleup] source={source}  train={len(tr_x)}  test={len(te_x)}  "
           f"input={n_input}  classes={n_classes}  n_exc={N_EXC}  epochs={EPOCHS}  T={T}  "
-          f"input_norm_power={INPUT_NORM_POWER}")
+          f"input_norm_power={INPUT_NORM_POWER}  inhibition={INHIBITION}  w_inh={W_INH}")
 
-    net = Network(n_input=n_input, n_exc=N_EXC, input_norm_power=INPUT_NORM_POWER, rng=rng)
+    net = Network(n_input=n_input, n_exc=N_EXC, input_norm_power=INPUT_NORM_POWER,
+                  inhibition=INHIBITION, w_inh=W_INH, rng=rng)
 
     t0 = time.time()
     net.train(tr_x, epochs=EPOCHS, T=T, progress=True)
