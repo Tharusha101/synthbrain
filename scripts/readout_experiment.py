@@ -39,7 +39,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, ROOT)
-from sweep_receptive_fields import load_split, draw_train, CLASSES  # noqa: E402
+from sweep_receptive_fields import (  # noqa: E402
+    load_split, draw_train, CLASSES, tmpl_match, dead_frac, save_rf_png)
 from synthbrain.torch_snn import TorchSNN, default_device           # noqa: E402
 
 OUT = os.path.join(ROOT, "outputs", "sweeps")
@@ -49,7 +50,10 @@ RESULTS = os.path.join(OUT, "readout_results.json")
 T_TRAIN = 350
 T_LONG = 700
 
-# The two endpoints of the wave-2 trade-off, retrained here so we can probe them.
+# Nets to train + probe. The first two are the wave-2 trade-off endpoints (already
+# in readout_results.json -> skipped on resume). The last two are the wave-4 winner
+# (a_plus=0.02, theta_plus=2.0) at n_exc=800 and 1600: the probe gives the true
+# headline accuracy for the CLEANEST templates, and n1600 tests the last scaling lever.
 NETS = {
     "clean_a020_th40": dict(n_exc=800, n_per_class=450, epochs=8,
                             a_plus=0.020, a_minus=0.012, norm_target=90.0,
@@ -59,6 +63,14 @@ NETS = {
                             a_plus=0.010, a_minus=0.012, norm_target=90.0,
                             w_inh=0.6, theta_plus=0.05, r_m=6.0,
                             input_norm_power=0.5, batch=128),
+    "best_th200_n800": dict(n_exc=800, n_per_class=450, epochs=8,
+                            a_plus=0.020, a_minus=0.012, norm_target=90.0,
+                            w_inh=0.6, theta_plus=2.0, r_m=6.0,
+                            input_norm_power=0.5, batch=128),
+    "best_th200_n1600": dict(n_exc=1600, n_per_class=600, epochs=8,
+                             a_plus=0.020, a_minus=0.012, norm_target=90.0,
+                             w_inh=0.6, theta_plus=2.0, r_m=6.0,
+                             input_norm_power=0.5, batch=96),
 }
 
 
@@ -93,19 +105,30 @@ def probe_acc(net, tr_x, tr_y, te_x, te_y, T):
 
 
 def main():
-    global T_TRAIN, T_LONG
+    global T_TRAIN, T_LONG, RESULTS
     if os.environ.get("SB_SMOKE") == "1":
         T_TRAIN, T_LONG = 80, 120
         for p in NETS.values():
             p.update(n_exc=60, n_per_class=20, epochs=1, batch=16)
+        RESULTS = os.path.join(OUT, "readout_results_smoke.json")  # don't touch real results
     device = default_device()
     print(f"[readout] device={device}")
-    pool_idx, imgs, lbls, te_x, te_y, _, shape = load_split()
+    pool_idx, imgs, lbls, te_x, te_y, class_means, shape = load_split()
     n_input = int(np.prod(shape))
     n_classes = len(CLASSES)
 
+    # Resume: keep nets already in readout_results.json, train only the new ones.
     results = []
+    if os.path.exists(RESULTS):
+        with open(RESULTS) as fh:
+            results = json.load(fh)
+    done = {r["net"] for r in results}
+    if done:
+        print(f"[readout] resuming; skipping already-done: {sorted(done)}")
+
     for name, p in NETS.items():
+        if name in done:
+            continue
         tr_x, tr_y = draw_train(pool_idx, imgs, lbls, p["n_per_class"],
                                 np.random.default_rng(0))
         p["tr_x"] = tr_x
@@ -114,31 +137,31 @@ def main():
         sec = time.time() - t0
         print(f"[{name}] trained in {sec:.0f}s; evaluating readouts...")
 
-        row = {"net": name, "train_sec": sec}
+        row = {"net": name, "n_exc": p["n_exc"], "train_sec": sec}
+        # native@T350 also assigns neuron_labels@T350 -> use those for tmpl/RF
         row["native_T350"] = native_acc(net, tr_x, tr_y, te_x, te_y, T_TRAIN, n_classes)
+        row["tmpl_match"] = tmpl_match(net, shape, class_means)
+        row["dead"] = dead_frac(net)
+        save_rf_png(net, shape, name)
         row["native_T700"] = native_acc(net, tr_x, tr_y, te_x, te_y, T_LONG, n_classes)
         row["probe_T350"] = probe_acc(net, tr_x, tr_y, te_x, te_y, T_TRAIN)
         row["probe_T700"] = probe_acc(net, tr_x, tr_y, te_x, te_y, T_LONG)
         results.append(row)
         print(f"[{name}] native@T350={row['native_T350']:.3f}  "
               f"native@T700={row['native_T700']:.3f}  "
-              f"probe@T350={row['probe_T350']:.3f}  probe@T700={row['probe_T700']:.3f}")
+              f"probe@T350={row['probe_T350']:.3f}  probe@T700={row['probe_T700']:.3f}  "
+              f"tmpl={row['tmpl_match']:.3f}  dead={row['dead']:.3f}")
         with open(RESULTS, "w") as fh:
             json.dump(results, fh, indent=2)
 
     print("\n=== readout comparison ===")
-    print(f"{'net':18s} {'nat@350':>8s} {'nat@700':>8s} {'prb@350':>8s} {'prb@700':>8s}")
+    print(f"{'net':20s} {'n_exc':>5s} {'nat@350':>8s} {'nat@700':>8s} "
+          f"{'prb@350':>8s} {'prb@700':>8s} {'tmpl':>6s} {'dead':>6s}")
     for r in results:
-        print(f"{r['net']:18s} {r['native_T350']:8.3f} {r['native_T700']:8.3f} "
-              f"{r['probe_T350']:8.3f} {r['probe_T700']:8.3f}")
-    if len(results) == 2:
-        clean, noisy = results[0], results[1]
-        gap_native = noisy["native_T350"] - clean["native_T350"]
-        gap_probe = noisy["probe_T700"] - clean["probe_T700"]
-        print(f"\nclean-vs-noisy gap: native@T350={gap_native:+.3f}  "
-              f"best-probe@T700={gap_probe:+.3f}")
-        print("If the probe gap << native gap, the clean net HAD the info and the "
-              "naive readout was the bottleneck. If it persists, the trade-off is real.")
+        print(f"{r['net']:20s} {r.get('n_exc', 0):5d} {r['native_T350']:8.3f} "
+              f"{r['native_T700']:8.3f} {r['probe_T350']:8.3f} {r['probe_T700']:8.3f} "
+              f"{r.get('tmpl_match', float('nan')):6.3f} {r.get('dead', float('nan')):6.3f}")
+    print("\nnative = project's mean-spike-count readout; prb = linear probe on counts.")
     print("[readout] DONE.")
 
 
