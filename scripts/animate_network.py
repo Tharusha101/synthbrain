@@ -40,14 +40,17 @@ T = 160             # ms per digit
 SEQ_LEN = 6         # how many digits to show in sequence
 TARGET_FRAMES = 200 # cap total frames (GIF size / render time)
 FADE = 0.55         # retina afterglow per frame
-NET_KW = dict(r_m=6.0, w_inh=0.6, norm_target=90.0)
+# The "clean net" learning recipe from the receptive-field sweep (see CLAUDE.md):
+# strong LTP (a_plus) for clean digit templates + adaptive-threshold homeostasis
+# (theta_plus) so all 100 neurons participate -> a more evenly coloured raster.
+NET_KW = dict(r_m=6.0, w_inh=0.6, norm_target=90.0, a_plus=0.02, theta_plus=2.0)
 
 
 def get_net_and_data(rng):
     """Return (net, test_images, test_labels, image_shape)."""
     try:
         imgs, lbls = encoding.load_mnist()
-        sel = np.concatenate([np.where(lbls == c)[0][:60] for c in CLASSES])
+        sel = np.concatenate([np.where(lbls == c)[0][:100] for c in CLASSES])
         rng.shuffle(sel)
         imgs, lbls = imgs[sel], lbls[sel]
     except Exception as e:
@@ -67,7 +70,7 @@ def get_net_and_data(rng):
     else:
         print("[anim] training network (first run; will be cached)...")
         net = Network(int(np.prod(shape)), N_EXC, rng=rng, **NET_KW)
-        net.train(tr_x, epochs=5, T=150, progress=True)
+        net.train(tr_x, epochs=8, T=150, progress=True)
         net.assign_labels(tr_x, tr_y, T=150, n_classes=len(CLASSES))
         net.save(CACHE)
         print("[anim] cached ->", CACHE)

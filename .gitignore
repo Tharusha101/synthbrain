@@ -12,3 +12,6 @@ outputs/*
 .synthbrain/
 *.npz
 MNIST/
+
+# ...but keep curated sample models (the trained best net) under version control.
+!outputs/samples/*.npz
