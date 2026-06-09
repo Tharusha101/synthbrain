@@ -140,7 +140,22 @@ CONFIGS_W3 = {
     "a016_th80":  dict(a_plus=0.016, theta_plus=0.8),
 }
 
-if WAVE == "3":
+# Wave 4: keep pushing theta_plus. Wave 3 improved on EVERY axis up to its edge
+# (theta=1.2: acc .60 / tmpl .72 / dead .014) and was still climbing -- so this
+# finds where homeostasis finally saturates or over-regularizes (very high theta
+# could raise thresholds so far that firing/accuracy collapse). a_plus=0.02 only
+# (wave 3 confirmed it beats 0.016).
+BASE_W4 = dict(BASE_W3)
+CONFIGS_W4 = {
+    "a020_th160": dict(a_plus=0.020, theta_plus=1.6),
+    "a020_th200": dict(a_plus=0.020, theta_plus=2.0),
+    "a020_th250": dict(a_plus=0.020, theta_plus=2.5),
+}
+
+if WAVE == "4":
+    BASE, CONFIGS = BASE_W4, CONFIGS_W4
+    RESULTS = os.path.join(OUT, "results_wave4.json")
+elif WAVE == "3":
     BASE, CONFIGS = BASE_W3, CONFIGS_W3
     RESULTS = os.path.join(OUT, "results_wave3.json")
 elif WAVE == "2":
