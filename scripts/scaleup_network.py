@@ -50,6 +50,13 @@ INPUT_NORM_POWER = 0.5
 # ever win) starved STDP and cratered to 29%. See scripts/_check_inhibition.py.
 INHIBITION = "lateral"
 W_INH = 0.6
+# Learning-rule recipe from the GPU receptive-field sweep (see CLAUDE.md): strong
+# LTP (a_plus) is what makes receptive fields clean, digit-like templates; strong
+# adaptive-threshold homeostasis (theta_plus) cancels the dead-neuron side-effect.
+# Same values as train_gpu.py. The CPU path keeps n_exc/data modest so it still runs
+# in minutes -- the full 0.905-probe recipe (n_exc=800, more data) lives in train_gpu.py.
+A_PLUS = 0.02
+THETA_PLUS = 2.0
 
 
 def get_data(rng):
@@ -123,10 +130,12 @@ def main():
 
     print(f"[scaleup] source={source}  train={len(tr_x)}  test={len(te_x)}  "
           f"input={n_input}  classes={n_classes}  n_exc={N_EXC}  epochs={EPOCHS}  T={T}  "
-          f"input_norm_power={INPUT_NORM_POWER}  inhibition={INHIBITION}  w_inh={W_INH}")
+          f"input_norm_power={INPUT_NORM_POWER}  inhibition={INHIBITION}  w_inh={W_INH}  "
+          f"a_plus={A_PLUS}  theta_plus={THETA_PLUS}")
 
     net = Network(n_input=n_input, n_exc=N_EXC, input_norm_power=INPUT_NORM_POWER,
-                  inhibition=INHIBITION, w_inh=W_INH, rng=rng)
+                  inhibition=INHIBITION, w_inh=W_INH, a_plus=A_PLUS,
+                  theta_plus=THETA_PLUS, rng=rng)
 
     t0 = time.time()
     net.train(tr_x, epochs=EPOCHS, T=T, progress=True)

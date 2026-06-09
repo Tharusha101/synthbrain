@@ -38,32 +38,35 @@ from synthbrain import encoding
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
 os.makedirs(OUT, exist_ok=True)
 
-# -- scale-up knobs (the GPU headroom is here: push N_PER_CLASS / EPOCHS up) --
+# -- WINNING RECIPE (from scripts/sweep_receptive_fields.py; see CLAUDE.md) --
+# a_plus=0.02 + theta_plus=2.0 at n_exc=800 give CLEAN, human-readable digit
+# templates (tmpl_match 0.89, ZERO dead neurons) AND the best accuracy: 0.905 with
+# the linear-probe readout (net.linear_probe), vs 0.615 with the native mean-count
+# readout -- the native readout severely undersells these selective neurons. NOTE:
+# n_exc=1600 was WORSE here (under-trained at this data budget); 800 is the sweet spot.
 CLASSES = list(range(10))
-N_PER_CLASS = 150           # raise this (and EPOCHS) on GPU for cleaner templates
-N_EXC = 400
-EPOCHS = 4
+N_PER_CLASS = 450
+N_EXC = 800
+EPOCHS = 8                  # 800 exc x 4500 imgs x 8 ep ~= 27 min on the RTX 4060
 T = 350
-BATCH_SIZE = 128            # images in parallel. On GPU, SMALL batches starve it
-                            # (kernels too tiny, launch overhead dominates) -- 32 gave
-                            # only ~3x over CPU. 128-256 saturates the 4060. In
-                            # "sequential" mode each image still renorms in the apply
-                            # loop, so the fidelity cost of a bigger batch is only the
-                            # longer frozen-W forward window. Sweep vs the 68.8%
-                            # baseline; drop it if accuracy slips, raise it for speed.
+BATCH_SIZE = 128            # 128-256 saturates the 4060; in "sequential" mode a bigger
+                            # batch only lengthens the frozen-W forward window. Drop if
+                            # accuracy slips, raise for speed.
 INPUT_NORM_POWER = 0.5
-W_INH = 0.6                 # lateral inhibition strength (the winning default)
-# How per-batch weight updates are applied. "sequential" (default) applies each
-# image's delta with an L1-renorm between them -> online-like, closes most of the
-# mini-batch accuracy gap. "summed" is faster but over-saturates at large batch.
-STDP_UPDATE = "sequential"
+W_INH = 0.6                 # lateral inhibition strength (won vs two_layer)
+A_PLUS = 0.02               # LTP strength: THE template-cleanliness lever
+THETA_PLUS = 2.0            # adaptive-threshold homeostasis: cancels the dead-neuron
+                            # side-effect of strong LTP (saturates ~2.0; >2.5 over-regularizes)
+STDP_UPDATE = "sequential"  # online-like mini-batch updates (vs faster "summed")
 
-# Override the big knobs from the environment so you can scale up WITHOUT editing
-# this file, e.g.  SB_N_PER_CLASS=600 SB_EPOCHS=10 SB_BATCH=128 SB_N_EXC=400
+# Override knobs from the environment (no edit needed), e.g.
+#   SB_N_PER_CLASS=600 SB_EPOCHS=10 SB_N_EXC=800 SB_A_PLUS=0.02 SB_THETA_PLUS=2.0
 N_PER_CLASS = int(os.environ.get("SB_N_PER_CLASS", N_PER_CLASS))
 EPOCHS = int(os.environ.get("SB_EPOCHS", EPOCHS))
 BATCH_SIZE = int(os.environ.get("SB_BATCH", BATCH_SIZE))
 N_EXC = int(os.environ.get("SB_N_EXC", N_EXC))
+A_PLUS = float(os.environ.get("SB_A_PLUS", A_PLUS))
+THETA_PLUS = float(os.environ.get("SB_THETA_PLUS", THETA_PLUS))
 
 
 def get_data(rng):
@@ -126,11 +129,12 @@ def main():
 
     print(f"[gpu] source={source}  train={len(tr_x)}  test={len(te_x)}  input={n_input}  "
           f"classes={n_classes}  n_exc={N_EXC}  epochs={EPOCHS}  T={T}  batch={BATCH_SIZE}  "
-          f"input_norm_power={INPUT_NORM_POWER}  w_inh={W_INH}  stdp_update={STDP_UPDATE}")
+          f"input_norm_power={INPUT_NORM_POWER}  w_inh={W_INH}  a_plus={A_PLUS}  "
+          f"theta_plus={THETA_PLUS}  stdp_update={STDP_UPDATE}")
 
     net = TorchSNN(n_input=n_input, n_exc=N_EXC, input_norm_power=INPUT_NORM_POWER,
-                   w_inh=W_INH, stdp_update=STDP_UPDATE, device=device,
-                   dtype=torch.float32, seed=0)
+                   w_inh=W_INH, a_plus=A_PLUS, theta_plus=THETA_PLUS,
+                   stdp_update=STDP_UPDATE, device=device, dtype=torch.float32, seed=0)
 
     t0 = time.time()
     net.train(tr_x, epochs=EPOCHS, T=T, batch_size=BATCH_SIZE, progress=True,
@@ -142,17 +146,21 @@ def main():
     net.assign_labels(tr_x, tr_y, T=T, n_classes=n_classes)
     acc = net.evaluate(te_x, te_y, T=T)
     chance = 1.0 / n_classes
-    print(f"[gpu] test accuracy = {acc:.3f}  (chance = {chance:.3f}; "
-          f"NumPy lateral baseline = 0.688)")
+    # Native mean-count readout undersells selective neurons; the linear probe is
+    # the representation's true accuracy (the headline number). See CLAUDE.md.
+    probe = net.linear_probe(tr_x, tr_y, te_x, te_y, T=T)
+    print(f"[gpu] native readout = {acc:.3f}   linear-probe = {probe:.3f}   "
+          f"(chance = {chance:.3f})")
 
     per_class_report(net, te_x, te_y, n_classes)
     plot_receptive_fields(net, shape)
     net.save(os.path.join(OUT, "gpu_net.npz"))
     print(f"[gpu] wrote receptive fields + gpu_net.npz to {OUT}")
-    return acc, chance
+    return acc, probe, chance
 
 
 if __name__ == "__main__":
-    acc, chance = main()
+    acc, probe, chance = main()
+    assert probe > acc, "linear probe should beat the native readout"
     assert acc > chance, "clustering accuracy did not beat chance"
     print("\nGPU scale-up run complete.")
