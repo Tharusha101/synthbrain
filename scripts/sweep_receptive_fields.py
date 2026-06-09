@@ -126,7 +126,24 @@ CONFIGS_W2 = {
     "a020_th05": dict(a_plus=0.020, theta_plus=0.05),  # control: clean LTP, NO homeostasis fix
 }
 
-if WAVE == "2":
+# Wave 3: push theta_plus past the wave-2 grid edge. Wave 2's best corner was the
+# HIGHEST theta tested (a020_th40: acc .48 / tmpl .43 / dead .21) and dead was
+# still falling -- so the optimum is beyond 0.4, not at it. This extends the
+# a_plus=0.02 line (and a check at 0.016) to theta {0.6,0.8,1.2} to find where
+# homeostasis saturates and how much more accuracy it buys back.
+BASE_W3 = dict(BASE_W2)
+CONFIGS_W3 = {
+    "a020_th60":  dict(a_plus=0.020, theta_plus=0.6),
+    "a020_th80":  dict(a_plus=0.020, theta_plus=0.8),
+    "a020_th120": dict(a_plus=0.020, theta_plus=1.2),
+    "a016_th60":  dict(a_plus=0.016, theta_plus=0.6),
+    "a016_th80":  dict(a_plus=0.016, theta_plus=0.8),
+}
+
+if WAVE == "3":
+    BASE, CONFIGS = BASE_W3, CONFIGS_W3
+    RESULTS = os.path.join(OUT, "results_wave3.json")
+elif WAVE == "2":
     BASE, CONFIGS = BASE_W2, CONFIGS_W2
     RESULTS = os.path.join(OUT, "results_wave2.json")
 else:
