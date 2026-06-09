@@ -11,8 +11,21 @@ Produced by `scripts/train_gpu.py` with the baked-in defaults (seed 0, MNIST spl
   one of 800 neurons is a clean digit; ~zero dead).
 - The native per-digit recalls in the train log look weak for 4/5/8/9 -- that is the
   native readout underselling selective neurons, NOT the representation; the linear
-  probe (and the confusion matrix from finalize_eval.py) show the true per-digit
-  picture. Multi-seed mean +/- std is reported separately by scripts/finalize_eval.py.
+  probe (and the confusion matrix) show the true per-digit picture.
+
+## Multi-seed robustness (`scripts/finalize_eval.py`, 5 seeds)
+The 0.91 is not a lucky seed -- retraining the recipe over 5 RNG seeds (varying
+weight init, Poisson encoding, batch order; fixed 150/class test set):
+
+| readout | mean +/- std |
+|---------|--------------|
+| **linear probe** | **0.900 +/- 0.007** |
+| native mean-count | 0.602 +/- 0.013 |
+
+Confusion matrix (`confusion_matrix.png`, linear probe): strong diagonal, 0/1/6
+near-perfect; the residual errors are the classic shape confusions -- 9->4, 9->7,
+3->8, 3->5, 5->3, 8->3. The probe recovers the digits the native readout drops
+(e.g. digit 4: native recall ~0.38 -> probe ~0.93).
 
 ## Winning configuration (`best_th200_n800`)
 Baked in as the defaults of `scripts/train_gpu.py`.
