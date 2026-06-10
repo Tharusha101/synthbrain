@@ -1,5 +1,9 @@
 # synthbrain
 
+[![tests](https://github.com/Tharusha101/synthbrain/actions/workflows/tests.yml/badge.svg)](https://github.com/Tharusha101/synthbrain/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+
 **A spiking neural network that learns to read MNIST digits — with no backpropagation, built from scratch in NumPy.**
 
 Real-style neurons (leaky integrate-and-fire) wired randomly, learning purely
