@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synthbrain"
+version = "0.1.0"
+description = "A from-scratch spiking neural network for MNIST"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Tharusha Pahasara" }]
+keywords = [
+    "spiking-neural-networks",
+    "stdp",
+    "mnist",
+    "neuroscience",
+    "unsupervised-learning",
+]
+dependencies = [
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+mnist = ["torch>=2.0", "torchvision>=0.15"]
+probe = ["scikit-learn>=1.3"]
+dev = ["pytest>=7.0", "black>=24.0", "ruff>=0.5"]
+
+[project.urls]
+Homepage = "https://github.com/Tharusha101/synthbrain"
+
+[tool.setuptools]
+packages = ["synthbrain"]
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+# Default rules (pyflakes F + a subset of pycodestyle E) are a good baseline.
+# Line length is managed by black, so don't double-report it.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# These intentionally insert the repo root on sys.path before importing the
+# package, so imports are not at the top of the file.
+"tests/*" = ["E402"]
+"scripts/*" = ["E402"]

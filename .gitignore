@@ -3,6 +3,12 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
+# Packaging / lint / build artifacts
+*.egg-info/
+build/
+dist/
+.ruff_cache/
+
 # Local Claude Code project context — kept on disk, not published.
 CLAUDE.md
 
