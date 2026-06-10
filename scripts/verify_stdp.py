@@ -4,6 +4,7 @@ import os
 import sys
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,15 +12,31 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from synthbrain.stdp import STDP
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs"
+)
 os.makedirs(OUT, exist_ok=True)
 
 
-def pairing_dw(delta_t: int, w0: float = 0.5, tau: float = 20.0,
-               a_plus: float = 0.01, a_minus: float = 0.012) -> float:
+def pairing_dw(
+    delta_t: int,
+    w0: float = 0.5,
+    tau: float = 20.0,
+    a_plus: float = 0.01,
+    a_minus: float = 0.012,
+) -> float:
     """One pre/post spike pair separated by delta_t = t_post - t_pre; return ΔW."""
-    stdp = STDP(1, 1, tau_pre=tau, tau_post=tau, a_plus=a_plus, a_minus=a_minus,
-                w_min=0.0, w_max=1.0, dt=1.0)
+    stdp = STDP(
+        1,
+        1,
+        tau_pre=tau,
+        tau_post=tau,
+        a_plus=a_plus,
+        a_minus=a_minus,
+        w_min=0.0,
+        w_max=1.0,
+        dt=1.0,
+    )
     W = np.array([[w0]])
     base = 50
     t_pre, t_post = base, base + delta_t
@@ -55,8 +72,10 @@ def checks():
 
     pre_before_post = dw[deltas == 1][0]
     post_before_pre = dw[deltas == -1][0]
-    print(f"[stdp] dt=+1 -> dW={pre_before_post:+.5f} (LTP), "
-          f"dt=-1 -> dW={post_before_pre:+.5f} (LTD)")
+    print(
+        f"[stdp] dt=+1 -> dW={pre_before_post:+.5f} (LTP), "
+        f"dt=-1 -> dW={post_before_pre:+.5f} (LTD)"
+    )
 
     assert pre_before_post > 0, "pre-before-post did not potentiate"
     assert post_before_pre < 0, "post-before-pre did not depress"
@@ -67,8 +86,12 @@ def checks():
     assert dw[deltas == -1][0] < dw[deltas == -20][0] < 0, "LTD not decaying with Δt"
 
     # Quantitative match to a_plus * exp(-Δt/tau).
-    assert np.isclose(pre_before_post, a_plus * np.exp(-1 / tau), atol=1e-4), "LTP magnitude off"
-    assert np.isclose(post_before_pre, -a_minus * np.exp(-1 / tau), atol=1e-4), "LTD magnitude off"
+    assert np.isclose(
+        pre_before_post, a_plus * np.exp(-1 / tau), atol=1e-4
+    ), "LTP magnitude off"
+    assert np.isclose(
+        post_before_pre, -a_minus * np.exp(-1 / tau), atol=1e-4
+    ), "LTD magnitude off"
     print("\nAll STDP checks passed.")
 
 

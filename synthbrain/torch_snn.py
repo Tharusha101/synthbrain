@@ -97,7 +97,9 @@ class TorchSNN:
         self.a_plus = a_plus
         self.a_minus = a_minus
         if stdp_update not in ("sequential", "summed"):
-            raise ValueError(f"stdp_update must be 'sequential' or 'summed', got {stdp_update!r}")
+            raise ValueError(
+                f"stdp_update must be 'sequential' or 'summed', got {stdp_update!r}"
+            )
         self.stdp_update = stdp_update
         self.device = torch.device(device or default_device())
         self.dtype = dtype
@@ -144,7 +146,9 @@ class TorchSNN:
 
     # -- input encoding (matches encoding.poisson_encode + network._eff_max_rate) --
 
-    def encode(self, images: torch.Tensor, T: int, max_rate: float = 63.75) -> torch.Tensor:
+    def encode(
+        self, images: torch.Tensor, T: int, max_rate: float = 63.75
+    ) -> torch.Tensor:
         """Poisson-encode a batch of images into spikes (B, T, n_input) as `dtype`.
 
         images: (B, n_input) float on `device`, in [0, 1] (raw pixel intensities).
@@ -152,16 +156,20 @@ class TorchSNN:
         same gain law as the NumPy path (`input_norm_power`).
         """
         B = images.shape[0]
-        peak = images.amax(dim=1, keepdim=True).clamp_min(1e-12)        # (B,1)
-        flat = images / peak                                           # peak-normalized
+        peak = images.amax(dim=1, keepdim=True).clamp_min(1e-12)  # (B,1)
+        flat = images / peak  # peak-normalized
         if self.input_norm > 0:
-            nf = flat.sum(dim=1, keepdim=True)                         # effective #on-pixels
+            nf = flat.sum(dim=1, keepdim=True)  # effective #on-pixels
             gain = (self.input_norm / (nf + 1e-12)) ** self.input_norm_power
         else:
             gain = torch.ones_like(peak)
-        p = flat * (max_rate * gain) * self.dt / 1000.0               # (B, n_input) spike prob
-        draws = torch.rand((B, T, self.n_input), generator=self.gen,
-                           device=self.device, dtype=self.dtype)
+        p = flat * (max_rate * gain) * self.dt / 1000.0  # (B, n_input) spike prob
+        draws = torch.rand(
+            (B, T, self.n_input),
+            generator=self.gen,
+            device=self.device,
+            dtype=self.dtype,
+        )
         return (draws < p.unsqueeze(1)).to(self.dtype)
 
     # -- core batched simulation ---------------------------------------------
@@ -181,7 +189,7 @@ class TorchSNN:
         f = dict(device=self.device, dtype=self.dtype)
         v = torch.full((B, self.n_exc), self.v_rest, **f)
         refrac_until = torch.zeros((B, self.n_exc), **f)
-        theta = self.theta.unsqueeze(0).expand(B, -1).clone()          # per-image local copy
+        theta = self.theta.unsqueeze(0).expand(B, -1).clone()  # per-image local copy
         g_exc = torch.zeros((B, self.n_exc), **f)
         g_inh = torch.zeros((B, self.n_exc), **f)
         prev_exc = torch.zeros((B, self.n_exc), **f)
@@ -190,15 +198,20 @@ class TorchSNN:
         if train:
             x_pre = torch.zeros((B, self.n_input), **f)
             x_post = torch.zeros((B, self.n_exc), **f)
-            dW = (torch.zeros((B, self.n_input, self.n_exc), **f) if seq
-                  else torch.zeros((self.n_input, self.n_exc), **f))
+            dW = (
+                torch.zeros((B, self.n_input, self.n_exc), **f)
+                if seq
+                else torch.zeros((self.n_input, self.n_exc), **f)
+            )
 
         t = 0.0
         for ti in range(T):
-            s_in = in_spikes[:, ti, :]                                 # (B, n_input)
+            s_in = in_spikes[:, ti, :]  # (B, n_input)
             # synaptic currents (decay then deposit)
             g_exc = g_exc * self.exc_decay + s_in @ self.W
-            g_inh = g_inh * self.inh_decay + prev_exc @ self.W_inh     # 1-step delayed inhibition
+            g_inh = (
+                g_inh * self.inh_decay + prev_exc @ self.W_inh
+            )  # 1-step delayed inhibition
             i_in = g_exc + g_inh
 
             # LIF update
@@ -209,8 +222,9 @@ class TorchSNN:
             v = torch.where(active, v + dv, torch.full_like(v, self.v_reset))
             spikes = (v >= (self.v_thresh + theta)) & active
             v = torch.where(spikes, torch.full_like(v, self.v_reset), v)
-            refrac_until = torch.where(spikes, torch.full_like(refrac_until, t + self.t_refrac),
-                                       refrac_until)
+            refrac_until = torch.where(
+                spikes, torch.full_like(refrac_until, t + self.t_refrac), refrac_until
+            )
             sp = spikes.to(self.dtype)
             theta = theta + sp * self.theta_plus
 
@@ -221,12 +235,14 @@ class TorchSNN:
                 # LTP: pre-before-post (x_pre x post);  LTD: post-before-pre (pre x x_post)
                 if seq:
                     # keep deltas per image (b i j) so each can be applied separately
-                    dW += self.a_plus * torch.einsum("bi,bj->bij", x_pre, sp) \
-                        - self.a_minus * torch.einsum("bi,bj->bij", s_in, x_post)
+                    dW += self.a_plus * torch.einsum(
+                        "bi,bj->bij", x_pre, sp
+                    ) - self.a_minus * torch.einsum("bi,bj->bij", s_in, x_post)
                 else:
                     # reduce over the batch immediately (cheaper, no per-image buffer)
-                    dW += self.a_plus * (x_pre.transpose(0, 1) @ sp) \
-                        - self.a_minus * (s_in.transpose(0, 1) @ x_post)
+                    dW += self.a_plus * (x_pre.transpose(0, 1) @ sp) - self.a_minus * (
+                        s_in.transpose(0, 1) @ x_post
+                    )
                 x_pre = x_pre + s_in
                 x_post = x_post + sp
 
@@ -239,9 +255,16 @@ class TorchSNN:
 
     # -- training ------------------------------------------------------------
 
-    def train(self, images: np.ndarray, epochs: int = 1, T: int = 350,
-              batch_size: int = 32, max_rate: float = 63.75, progress: bool = False,
-              rng: np.random.Generator | None = None):
+    def train(
+        self,
+        images: np.ndarray,
+        epochs: int = 1,
+        T: int = 350,
+        batch_size: int = 32,
+        max_rate: float = 63.75,
+        progress: bool = False,
+        rng: np.random.Generator | None = None,
+    ):
         """Mini-batch unsupervised training. `images` is (N, H, W) or (N, n_input)."""
         rng = rng or np.random.default_rng(0)
         X = self._to_device(images)
@@ -249,7 +272,7 @@ class TorchSNN:
         for ep in range(epochs):
             order = rng.permutation(N)
             for bi in range(0, N, batch_size):
-                idx = order[bi:bi + batch_size]
+                idx = order[bi : bi + batch_size]
                 batch = X[torch.as_tensor(idx, device=self.device)]
                 in_spikes = self.encode(batch, T, max_rate=max_rate)
                 counts, dW, theta = self._simulate(in_spikes, train=True)
@@ -283,13 +306,18 @@ class TorchSNN:
 
     # -- forward (no learning) -----------------------------------------------
 
-    def counts(self, images: np.ndarray, T: int = 350, batch_size: int = 256,
-               max_rate: float = 63.75) -> np.ndarray:
+    def counts(
+        self,
+        images: np.ndarray,
+        T: int = 350,
+        batch_size: int = 256,
+        max_rate: float = 63.75,
+    ) -> np.ndarray:
         """Excitatory spike counts per image (N, n_exc) with plasticity off."""
         X = self._to_device(images)
         out = []
         for bi in range(0, X.shape[0], batch_size):
-            batch = X[bi:bi + batch_size]
+            batch = X[bi : bi + batch_size]
             in_spikes = self.encode(batch, T, max_rate=max_rate)
             out.append(self._simulate(in_spikes, train=False).cpu().numpy())
         return np.concatenate(out, axis=0)
@@ -300,11 +328,17 @@ class TorchSNN:
 
     # -- readout (labels used only here, never during learning) --------------
 
-    def assign_labels(self, images: np.ndarray, labels: np.ndarray, T: int = 350,
-                      n_classes: int | None = None, batch_size: int = 256) -> np.ndarray:
+    def assign_labels(
+        self,
+        images: np.ndarray,
+        labels: np.ndarray,
+        T: int = 350,
+        n_classes: int | None = None,
+        batch_size: int = 256,
+    ) -> np.ndarray:
         labels = np.asarray(labels)
         n_classes = n_classes or int(labels.max()) + 1
-        counts = self.counts(images, T=T, batch_size=batch_size)        # (N, n_exc)
+        counts = self.counts(images, T=T, batch_size=batch_size)  # (N, n_exc)
         rate_sum = np.zeros((self.n_exc, n_classes))
         per_class = np.zeros(n_classes, dtype=np.int64)
         for c in range(n_classes):
@@ -318,11 +352,13 @@ class TorchSNN:
         self.neuron_response = avg
         return self.neuron_labels
 
-    def predict(self, images: np.ndarray, T: int = 350, batch_size: int = 256) -> np.ndarray:
+    def predict(
+        self, images: np.ndarray, T: int = 350, batch_size: int = 256
+    ) -> np.ndarray:
         """Predicted class per image: the class whose neurons respond most strongly."""
         if self.neuron_labels is None:
             raise RuntimeError("call assign_labels() before predict()")
-        counts = self.counts(images, T=T, batch_size=batch_size)        # (N, n_exc)
+        counts = self.counts(images, T=T, batch_size=batch_size)  # (N, n_exc)
         n_classes = int(self.neuron_labels.max()) + 1
         scores = np.zeros((len(counts), n_classes))
         for c in range(n_classes):
@@ -331,15 +367,27 @@ class TorchSNN:
                 scores[:, c] = counts[:, mask].mean(axis=1)
         return scores.argmax(axis=1)
 
-    def evaluate(self, images: np.ndarray, labels: np.ndarray, T: int = 350,
-                 batch_size: int = 256) -> float:
+    def evaluate(
+        self,
+        images: np.ndarray,
+        labels: np.ndarray,
+        T: int = 350,
+        batch_size: int = 256,
+    ) -> float:
         labels = np.asarray(labels)
         preds = self.predict(images, T=T, batch_size=batch_size)
         return float((preds == labels).mean())
 
-    def linear_probe(self, train_images: np.ndarray, train_labels: np.ndarray,
-                     test_images: np.ndarray, test_labels: np.ndarray,
-                     T: int = 350, batch_size: int = 256, C: float = 1.0) -> float:
+    def linear_probe(
+        self,
+        train_images: np.ndarray,
+        train_labels: np.ndarray,
+        test_images: np.ndarray,
+        test_labels: np.ndarray,
+        T: int = 350,
+        batch_size: int = 256,
+        C: float = 1.0,
+    ) -> float:
         """Linear-probe readout: logistic regression on frozen spike counts.
 
         The native readout (assign_labels/predict) labels whole neuron GROUPS by
@@ -368,9 +416,14 @@ class TorchSNN:
 
     def save(self, path: str):
         labels = self.neuron_labels if self.neuron_labels is not None else np.array([])
-        np.savez(path, n_input=self.n_input, n_exc=self.n_exc,
-                 W=self.W.cpu().numpy(), theta=self.theta.cpu().numpy(),
-                 neuron_labels=labels)
+        np.savez(
+            path,
+            n_input=self.n_input,
+            n_exc=self.n_exc,
+            W=self.W.cpu().numpy(),
+            theta=self.theta.cpu().numpy(),
+            neuron_labels=labels,
+        )
 
     # -- helpers -------------------------------------------------------------
 

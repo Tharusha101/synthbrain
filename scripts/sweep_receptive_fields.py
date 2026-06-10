@@ -43,6 +43,7 @@ import time
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -56,15 +57,27 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "outputs", "sweeps")
 os.makedirs(OUT, exist_ok=True)
 CLASSES = list(range(10))
-TEST_PER_CLASS = 150           # fixed held-out test set, same for every config
+TEST_PER_CLASS = 150  # fixed held-out test set, same for every config
 SMOKE = os.environ.get("SB_SMOKE") == "1"
-WAVE = os.environ.get("SB_WAVE", "1")   # "1" = OFAT screen (done), "2" = a_plus x theta_plus
+WAVE = os.environ.get(
+    "SB_WAVE", "1"
+)  # "1" = OFAT screen (done), "2" = a_plus x theta_plus
 
 # Wave 1 shared defaults; each config overrides a subset.
 BASE_W1 = dict(
-    n_exc=400, n_per_class=300, epochs=6, T=350,
-    a_plus=0.01, a_minus=0.012, norm_target=90.0, w_inh=0.6,
-    theta_plus=0.05, r_m=6.0, input_norm_power=0.5, batch=128, max_rate=63.75,
+    n_exc=400,
+    n_per_class=300,
+    epochs=6,
+    T=350,
+    a_plus=0.01,
+    a_minus=0.012,
+    norm_target=90.0,
+    w_inh=0.6,
+    theta_plus=0.05,
+    r_m=6.0,
+    input_norm_power=0.5,
+    batch=128,
+    max_rate=63.75,
 )
 
 # Ordered most-informative-first so an early stop still yields signal.
@@ -73,30 +86,45 @@ BASE_W1 = dict(
 # Phase 3: scale neurons with proportionally more data.
 CONFIGS_W1 = {
     # -- Phase 1: OFAT screening --
-    "baseline":   {},
-    "norm60":     dict(norm_target=60),
-    "norm45":     dict(norm_target=45),
-    "norm30":     dict(norm_target=30),
-    "aminus018":  dict(a_minus=0.018),
-    "aminus024":  dict(a_minus=0.024),
-    "aminus036":  dict(a_minus=0.036),
-    "aplus015":   dict(a_plus=0.015),
-    "aplus020":   dict(a_plus=0.020),
-    "T500":       dict(T=500),
-    "T700":       dict(T=700),
-    "winh10":     dict(w_inh=1.0),
-    "winh15":     dict(w_inh=1.5),
+    "baseline": {},
+    "norm60": dict(norm_target=60),
+    "norm45": dict(norm_target=45),
+    "norm30": dict(norm_target=30),
+    "aminus018": dict(a_minus=0.018),
+    "aminus024": dict(a_minus=0.024),
+    "aminus036": dict(a_minus=0.036),
+    "aplus015": dict(a_plus=0.015),
+    "aplus020": dict(a_plus=0.020),
+    "T500": dict(T=500),
+    "T700": dict(T=700),
+    "winh10": dict(w_inh=1.0),
+    "winh15": dict(w_inh=1.5),
     # -- Phase 2: combine the promising levers at n_exc=400 --
-    "combo_A":    dict(norm_target=45, w_inh=1.0, a_minus=0.018),
-    "combo_B":    dict(norm_target=45, w_inh=1.0, a_minus=0.024, a_plus=0.012),
+    "combo_A": dict(norm_target=45, w_inh=1.0, a_minus=0.018),
+    "combo_B": dict(norm_target=45, w_inh=1.0, a_minus=0.024, a_plus=0.012),
     # -- Phase 3: scale the layer (more data for bigger nets) --
-    "n800_base":      dict(n_exc=800, n_per_class=450, epochs=8),
-    "n800_combo":     dict(n_exc=800, n_per_class=450, epochs=8,
-                           norm_target=45, w_inh=1.0, a_minus=0.018),
-    "n1600_combo":    dict(n_exc=1600, n_per_class=600, epochs=8, batch=96,
-                           norm_target=45, w_inh=1.0, a_minus=0.018),
-    "n1600_combo_lng": dict(n_exc=1600, n_per_class=600, epochs=12, batch=96,
-                            norm_target=45, w_inh=1.0, a_minus=0.018),
+    "n800_base": dict(n_exc=800, n_per_class=450, epochs=8),
+    "n800_combo": dict(
+        n_exc=800, n_per_class=450, epochs=8, norm_target=45, w_inh=1.0, a_minus=0.018
+    ),
+    "n1600_combo": dict(
+        n_exc=1600,
+        n_per_class=600,
+        epochs=8,
+        batch=96,
+        norm_target=45,
+        w_inh=1.0,
+        a_minus=0.018,
+    ),
+    "n1600_combo_lng": dict(
+        n_exc=1600,
+        n_per_class=600,
+        epochs=12,
+        batch=96,
+        norm_target=45,
+        w_inh=1.0,
+        a_minus=0.018,
+    ),
 }
 
 # Wave 2: a_plus x theta_plus at n_exc=800.
@@ -109,12 +137,22 @@ CONFIGS_W1 = {
 # (theta_plus, baseline 0.05 is too weak) at the accuracy-friendly n_exc=800,
 # hunting a config that is BOTH clean (tmpl>0) AND accurate (acc>=0.70, dead~0).
 BASE_W2 = dict(
-    n_exc=800, n_per_class=450, epochs=8, T=350,
-    a_plus=0.016, a_minus=0.012, norm_target=90.0, w_inh=0.6,
-    theta_plus=0.2, r_m=6.0, input_norm_power=0.5, batch=128, max_rate=63.75,
+    n_exc=800,
+    n_per_class=450,
+    epochs=8,
+    T=350,
+    a_plus=0.016,
+    a_minus=0.012,
+    norm_target=90.0,
+    w_inh=0.6,
+    theta_plus=0.2,
+    r_m=6.0,
+    input_norm_power=0.5,
+    batch=128,
+    max_rate=63.75,
 )
 CONFIGS_W2 = {
-    "a016_th20": dict(a_plus=0.016, theta_plus=0.2),   # best a-priori guess
+    "a016_th20": dict(a_plus=0.016, theta_plus=0.2),  # best a-priori guess
     "a020_th20": dict(a_plus=0.020, theta_plus=0.2),
     "a016_th10": dict(a_plus=0.016, theta_plus=0.1),
     "a020_th40": dict(a_plus=0.020, theta_plus=0.4),
@@ -123,7 +161,9 @@ CONFIGS_W2 = {
     "a016_th40": dict(a_plus=0.016, theta_plus=0.4),
     "a013_th20": dict(a_plus=0.013, theta_plus=0.2),
     "a013_th40": dict(a_plus=0.013, theta_plus=0.4),
-    "a020_th05": dict(a_plus=0.020, theta_plus=0.05),  # control: clean LTP, NO homeostasis fix
+    "a020_th05": dict(
+        a_plus=0.020, theta_plus=0.05
+    ),  # control: clean LTP, NO homeostasis fix
 }
 
 # Wave 3: push theta_plus past the wave-2 grid edge. Wave 2's best corner was the
@@ -133,11 +173,11 @@ CONFIGS_W2 = {
 # homeostasis saturates and how much more accuracy it buys back.
 BASE_W3 = dict(BASE_W2)
 CONFIGS_W3 = {
-    "a020_th60":  dict(a_plus=0.020, theta_plus=0.6),
-    "a020_th80":  dict(a_plus=0.020, theta_plus=0.8),
+    "a020_th60": dict(a_plus=0.020, theta_plus=0.6),
+    "a020_th80": dict(a_plus=0.020, theta_plus=0.8),
     "a020_th120": dict(a_plus=0.020, theta_plus=1.2),
-    "a016_th60":  dict(a_plus=0.016, theta_plus=0.6),
-    "a016_th80":  dict(a_plus=0.016, theta_plus=0.8),
+    "a016_th60": dict(a_plus=0.016, theta_plus=0.6),
+    "a016_th80": dict(a_plus=0.016, theta_plus=0.8),
 }
 
 # Wave 4: keep pushing theta_plus. Wave 3 improved on EVERY axis up to its edge
@@ -226,8 +266,9 @@ def mean_tv(net, shape):
         if s <= 0:
             continue
         rn = r / s
-        tvs.append(float(np.abs(np.diff(rn, axis=0)).sum()
-                         + np.abs(np.diff(rn, axis=1)).sum()))
+        tvs.append(
+            float(np.abs(np.diff(rn, axis=0)).sum() + np.abs(np.diff(rn, axis=1)).sum())
+        )
     return float(np.mean(tvs)) if tvs else float("nan")
 
 
@@ -273,11 +314,15 @@ def print_leaderboard(results):
         return
     rows = sorted(results, key=lambda r: r["acc"], reverse=True)
     print("\n=== leaderboard (by acc) ===")
-    print(f"{'config':18s} {'acc':>6s} {'tmpl':>6s} {'tv':>7s} {'dead':>5s} "
-          f"{'covsp':>6s} {'sec':>6s}")
+    print(
+        f"{'config':18s} {'acc':>6s} {'tmpl':>6s} {'tv':>7s} {'dead':>5s} "
+        f"{'covsp':>6s} {'sec':>6s}"
+    )
     for r in rows:
-        print(f"{r['name']:18s} {r['acc']:6.3f} {r['tmpl_match']:6.3f} "
-              f"{r['tv']:7.4f} {r['dead']:5.2f} {r['cov_spread']:6.1f} {r['sec']:6.0f}")
+        print(
+            f"{r['name']:18s} {r['acc']:6.3f} {r['tmpl_match']:6.3f} "
+            f"{r['tv']:7.4f} {r['dead']:5.2f} {r['cov_spread']:6.1f} {r['sec']:6.0f}"
+        )
     print("baseline ref: NumPy lateral = 0.688 acc; templates were noisy (tmpl low).\n")
 
 
@@ -292,15 +337,30 @@ def run_one(name, cfg, data):
     tr_x, tr_y = draw_train(pool_idx, imgs, lbls, p["n_per_class"], rng)
 
     net = TorchSNN(
-        n_input=n_input, n_exc=p["n_exc"], input_norm_power=p["input_norm_power"],
-        w_inh=p["w_inh"], a_plus=p["a_plus"], a_minus=p["a_minus"],
-        norm_target=p["norm_target"], theta_plus=p["theta_plus"], r_m=p["r_m"],
-        stdp_update="sequential", device=device, dtype=torch.float32, seed=0,
+        n_input=n_input,
+        n_exc=p["n_exc"],
+        input_norm_power=p["input_norm_power"],
+        w_inh=p["w_inh"],
+        a_plus=p["a_plus"],
+        a_minus=p["a_minus"],
+        norm_target=p["norm_target"],
+        theta_plus=p["theta_plus"],
+        r_m=p["r_m"],
+        stdp_update="sequential",
+        device=device,
+        dtype=torch.float32,
+        seed=0,
     )
 
     t0 = time.time()
-    net.train(tr_x, epochs=p["epochs"], T=p["T"], batch_size=p["batch"],
-              progress=False, rng=np.random.default_rng(0))
+    net.train(
+        tr_x,
+        epochs=p["epochs"],
+        T=p["T"],
+        batch_size=p["batch"],
+        progress=False,
+        rng=np.random.default_rng(0),
+    )
     if device == "cuda":
         torch.cuda.synchronize()
     sec = time.time() - t0
@@ -313,12 +373,24 @@ def run_one(name, cfg, data):
     spread, n_zero = cov_spread(net, n_classes)
     save_rf_png(net, shape, name)
 
-    rec = dict(name=name, params=p, acc=acc, tmpl_match=tm, tv=tv, dead=dead,
-               cov_spread=spread, n_zero_classes=n_zero, sec=sec,
-               n_train=int(len(tr_x)), presentations=int(len(tr_x) * p["epochs"]))
-    print(f"[{name}] acc={acc:.3f} tmpl={tm:.3f} tv={tv:.4f} dead={dead:.2f} "
-          f"covsp={spread:.1f} zero={n_zero} in {sec:.0f}s "
-          f"(pres={rec['presentations']}, n_exc={p['n_exc']})")
+    rec = dict(
+        name=name,
+        params=p,
+        acc=acc,
+        tmpl_match=tm,
+        tv=tv,
+        dead=dead,
+        cov_spread=spread,
+        n_zero_classes=n_zero,
+        sec=sec,
+        n_train=int(len(tr_x)),
+        presentations=int(len(tr_x) * p["epochs"]),
+    )
+    print(
+        f"[{name}] acc={acc:.3f} tmpl={tm:.3f} tv={tv:.4f} dead={dead:.2f} "
+        f"covsp={spread:.1f} zero={n_zero} in {sec:.0f}s "
+        f"(pres={rec['presentations']}, n_exc={p['n_exc']})"
+    )
     return rec
 
 
@@ -346,10 +418,18 @@ def main():
             print(f"[{name}] FAILED: {e}")
             if device == "cuda":
                 torch.cuda.empty_cache()
-            rec = dict(name=name, params=dict(BASE, **cfg), acc=float("nan"),
-                       tmpl_match=float("nan"), tv=float("nan"), dead=float("nan"),
-                       cov_spread=float("nan"), n_zero_classes=-1, sec=0.0,
-                       error=str(e))
+            rec = dict(
+                name=name,
+                params=dict(BASE, **cfg),
+                acc=float("nan"),
+                tmpl_match=float("nan"),
+                tv=float("nan"),
+                dead=float("nan"),
+                cov_spread=float("nan"),
+                n_zero_classes=-1,
+                sec=0.0,
+                error=str(e),
+            )
         results.append(rec)
         with open(RESULTS, "w") as fh:
             json.dump(results, fh, indent=2)

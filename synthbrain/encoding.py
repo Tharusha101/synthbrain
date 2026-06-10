@@ -38,8 +38,8 @@ def poisson_encode(
     peak = flat.max()
     if peak > 0:
         flat = flat / peak
-    rates = flat * max_rate                       # Hz, shape (n_pixels,)
-    p = rates * dt / 1000.0                        # spike probability per step
+    rates = flat * max_rate  # Hz, shape (n_pixels,)
+    p = rates * dt / 1000.0  # spike probability per step
     draws = rng.random((T, flat.size))
     return draws < p[None, :]
 
@@ -77,14 +77,14 @@ def synthetic_digits(
         img = np.zeros((size, size))
         mid = size // 2
         band = max(1, size // 8)
-        if c == 0:        # vertical bar
+        if c == 0:  # vertical bar
             img[:, mid - band : mid + band] = 1.0
-        elif c == 1:      # horizontal bar
+        elif c == 1:  # horizontal bar
             img[mid - band : mid + band, :] = 1.0
-        elif c == 2:      # cross
+        elif c == 2:  # cross
             img[:, mid - band : mid + band] = 1.0
             img[mid - band : mid + band, :] = 1.0
-        else:             # diagonal
+        else:  # diagonal
             for k in range(size):
                 lo, hi = max(0, k - band), min(size, k + band)
                 img[k, lo:hi] = 1.0

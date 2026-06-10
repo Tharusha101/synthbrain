@@ -40,8 +40,14 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, ROOT)
 from sweep_receptive_fields import (  # noqa: E402
-    load_split, draw_train, CLASSES, tmpl_match, dead_frac, save_rf_png)
-from synthbrain.torch_snn import TorchSNN, default_device           # noqa: E402
+    load_split,
+    draw_train,
+    CLASSES,
+    tmpl_match,
+    dead_frac,
+    save_rf_png,
+)
+from synthbrain.torch_snn import TorchSNN, default_device  # noqa: E402
 
 OUT = os.path.join(ROOT, "outputs", "sweeps")
 os.makedirs(OUT, exist_ok=True)
@@ -55,34 +61,85 @@ T_LONG = 700
 # (a_plus=0.02, theta_plus=2.0) at n_exc=800 and 1600: the probe gives the true
 # headline accuracy for the CLEANEST templates, and n1600 tests the last scaling lever.
 NETS = {
-    "clean_a020_th40": dict(n_exc=800, n_per_class=450, epochs=8,
-                            a_plus=0.020, a_minus=0.012, norm_target=90.0,
-                            w_inh=0.6, theta_plus=0.4, r_m=6.0,
-                            input_norm_power=0.5, batch=128),
-    "noisy_n800_base": dict(n_exc=800, n_per_class=450, epochs=8,
-                            a_plus=0.010, a_minus=0.012, norm_target=90.0,
-                            w_inh=0.6, theta_plus=0.05, r_m=6.0,
-                            input_norm_power=0.5, batch=128),
-    "best_th200_n800": dict(n_exc=800, n_per_class=450, epochs=8,
-                            a_plus=0.020, a_minus=0.012, norm_target=90.0,
-                            w_inh=0.6, theta_plus=2.0, r_m=6.0,
-                            input_norm_power=0.5, batch=128),
-    "best_th200_n1600": dict(n_exc=1600, n_per_class=600, epochs=8,
-                             a_plus=0.020, a_minus=0.012, norm_target=90.0,
-                             w_inh=0.6, theta_plus=2.0, r_m=6.0,
-                             input_norm_power=0.5, batch=96),
+    "clean_a020_th40": dict(
+        n_exc=800,
+        n_per_class=450,
+        epochs=8,
+        a_plus=0.020,
+        a_minus=0.012,
+        norm_target=90.0,
+        w_inh=0.6,
+        theta_plus=0.4,
+        r_m=6.0,
+        input_norm_power=0.5,
+        batch=128,
+    ),
+    "noisy_n800_base": dict(
+        n_exc=800,
+        n_per_class=450,
+        epochs=8,
+        a_plus=0.010,
+        a_minus=0.012,
+        norm_target=90.0,
+        w_inh=0.6,
+        theta_plus=0.05,
+        r_m=6.0,
+        input_norm_power=0.5,
+        batch=128,
+    ),
+    "best_th200_n800": dict(
+        n_exc=800,
+        n_per_class=450,
+        epochs=8,
+        a_plus=0.020,
+        a_minus=0.012,
+        norm_target=90.0,
+        w_inh=0.6,
+        theta_plus=2.0,
+        r_m=6.0,
+        input_norm_power=0.5,
+        batch=128,
+    ),
+    "best_th200_n1600": dict(
+        n_exc=1600,
+        n_per_class=600,
+        epochs=8,
+        a_plus=0.020,
+        a_minus=0.012,
+        norm_target=90.0,
+        w_inh=0.6,
+        theta_plus=2.0,
+        r_m=6.0,
+        input_norm_power=0.5,
+        batch=96,
+    ),
 }
 
 
 def build_and_train(p, n_input, device):
     net = TorchSNN(
-        n_input=n_input, n_exc=p["n_exc"], input_norm_power=p["input_norm_power"],
-        w_inh=p["w_inh"], a_plus=p["a_plus"], a_minus=p["a_minus"],
-        norm_target=p["norm_target"], theta_plus=p["theta_plus"], r_m=p["r_m"],
-        stdp_update="sequential", device=device, dtype=torch.float32, seed=0,
+        n_input=n_input,
+        n_exc=p["n_exc"],
+        input_norm_power=p["input_norm_power"],
+        w_inh=p["w_inh"],
+        a_plus=p["a_plus"],
+        a_minus=p["a_minus"],
+        norm_target=p["norm_target"],
+        theta_plus=p["theta_plus"],
+        r_m=p["r_m"],
+        stdp_update="sequential",
+        device=device,
+        dtype=torch.float32,
+        seed=0,
     )
-    net.train(p["tr_x"], epochs=p["epochs"], T=T_TRAIN, batch_size=p["batch"],
-              progress=False, rng=np.random.default_rng(0))
+    net.train(
+        p["tr_x"],
+        epochs=p["epochs"],
+        T=T_TRAIN,
+        batch_size=p["batch"],
+        progress=False,
+        rng=np.random.default_rng(0),
+    )
     if device == "cuda":
         torch.cuda.synchronize()
     return net
@@ -110,7 +167,9 @@ def main():
         T_TRAIN, T_LONG = 80, 120
         for p in NETS.values():
             p.update(n_exc=60, n_per_class=20, epochs=1, batch=16)
-        RESULTS = os.path.join(OUT, "readout_results_smoke.json")  # don't touch real results
+        RESULTS = os.path.join(
+            OUT, "readout_results_smoke.json"
+        )  # don't touch real results
     device = default_device()
     print(f"[readout] device={device}")
     pool_idx, imgs, lbls, te_x, te_y, class_means, shape = load_split()
@@ -129,8 +188,9 @@ def main():
     for name, p in NETS.items():
         if name in done:
             continue
-        tr_x, tr_y = draw_train(pool_idx, imgs, lbls, p["n_per_class"],
-                                np.random.default_rng(0))
+        tr_x, tr_y = draw_train(
+            pool_idx, imgs, lbls, p["n_per_class"], np.random.default_rng(0)
+        )
         p["tr_x"] = tr_x
         t0 = time.time()
         net = build_and_train(p, n_input, device)
@@ -147,21 +207,29 @@ def main():
         row["probe_T350"] = probe_acc(net, tr_x, tr_y, te_x, te_y, T_TRAIN)
         row["probe_T700"] = probe_acc(net, tr_x, tr_y, te_x, te_y, T_LONG)
         results.append(row)
-        print(f"[{name}] native@T350={row['native_T350']:.3f}  "
-              f"native@T700={row['native_T700']:.3f}  "
-              f"probe@T350={row['probe_T350']:.3f}  probe@T700={row['probe_T700']:.3f}  "
-              f"tmpl={row['tmpl_match']:.3f}  dead={row['dead']:.3f}")
+        print(
+            f"[{name}] native@T350={row['native_T350']:.3f}  "
+            f"native@T700={row['native_T700']:.3f}  "
+            f"probe@T350={row['probe_T350']:.3f}  probe@T700={row['probe_T700']:.3f}  "
+            f"tmpl={row['tmpl_match']:.3f}  dead={row['dead']:.3f}"
+        )
         with open(RESULTS, "w") as fh:
             json.dump(results, fh, indent=2)
 
     print("\n=== readout comparison ===")
-    print(f"{'net':20s} {'n_exc':>5s} {'nat@350':>8s} {'nat@700':>8s} "
-          f"{'prb@350':>8s} {'prb@700':>8s} {'tmpl':>6s} {'dead':>6s}")
+    print(
+        f"{'net':20s} {'n_exc':>5s} {'nat@350':>8s} {'nat@700':>8s} "
+        f"{'prb@350':>8s} {'prb@700':>8s} {'tmpl':>6s} {'dead':>6s}"
+    )
     for r in results:
-        print(f"{r['net']:20s} {r.get('n_exc', 0):5d} {r['native_T350']:8.3f} "
-              f"{r['native_T700']:8.3f} {r['probe_T350']:8.3f} {r['probe_T700']:8.3f} "
-              f"{r.get('tmpl_match', float('nan')):6.3f} {r.get('dead', float('nan')):6.3f}")
-    print("\nnative = project's mean-spike-count readout; prb = linear probe on counts.")
+        print(
+            f"{r['net']:20s} {r.get('n_exc', 0):5d} {r['native_T350']:8.3f} "
+            f"{r['native_T700']:8.3f} {r['probe_T350']:8.3f} {r['probe_T700']:8.3f} "
+            f"{r.get('tmpl_match', float('nan')):6.3f} {r.get('dead', float('nan')):6.3f}"
+        )
+    print(
+        "\nnative = project's mean-spike-count readout; prb = linear probe on counts."
+    )
     print("[readout] DONE.")
 
 

@@ -19,6 +19,7 @@ import sys
 import time
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,7 +28,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from synthbrain.network import Network
 from synthbrain import encoding
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs"
+)
 os.makedirs(OUT, exist_ok=True)
 N_CLASSES = 10
 
@@ -60,8 +63,9 @@ def confusion_and_acc(net, te_x, te_y, T):
     cm = np.zeros((N_CLASSES, N_CLASSES), dtype=int)
     for img, lab in zip(te_x, te_y):
         cm[lab, net.classify(img, T=T)] += 1
-    per_class = np.divide(np.diag(cm), cm.sum(1),
-                          out=np.zeros(N_CLASSES), where=cm.sum(1) > 0)
+    per_class = np.divide(
+        np.diag(cm), cm.sum(1), out=np.zeros(N_CLASSES), where=cm.sum(1) > 0
+    )
     acc = np.trace(cm) / cm.sum()
     return cm, acc, per_class
 
@@ -69,15 +73,26 @@ def confusion_and_acc(net, te_x, te_y, T):
 def plot_confusion(cm, acc, path):
     fig, ax = plt.subplots(figsize=(5.6, 5))
     im = ax.imshow(cm, cmap="Blues")
-    ax.set(xlabel="predicted", ylabel="true",
-           title=f"Confusion matrix (acc={acc:.3f}, chance=0.100)",
-           xticks=range(N_CLASSES), yticks=range(N_CLASSES))
+    ax.set(
+        xlabel="predicted",
+        ylabel="true",
+        title=f"Confusion matrix (acc={acc:.3f}, chance=0.100)",
+        xticks=range(N_CLASSES),
+        yticks=range(N_CLASSES),
+    )
     thresh = cm.max() / 2 if cm.max() else 0.5
     for i in range(N_CLASSES):
         for j in range(N_CLASSES):
             if cm[i, j]:
-                ax.text(j, i, cm[i, j], ha="center", va="center", fontsize=7,
-                        color="white" if cm[i, j] > thresh else "black")
+                ax.text(
+                    j,
+                    i,
+                    cm[i, j],
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    color="white" if cm[i, j] > thresh else "black",
+                )
     fig.colorbar(im, fraction=0.046, pad=0.04)
     fig.tight_layout()
     fig.savefig(path, dpi=130)
@@ -95,7 +110,8 @@ def plot_receptive_fields(net, path, cols=8):
             members = members[np.argsort(-resp[members, c])][:cols]
         for j in range(cols):
             ax = axes[c, j]
-            ax.set_xticks([]); ax.set_yticks([])
+            ax.set_xticks([])
+            ax.set_yticks([])
             if j < len(members):
                 ax.imshow(rf[members[j]], cmap="hot")
             else:
@@ -117,8 +133,10 @@ def main():
     te_idx = balanced_subset(imgs, lbls, a.test_per_class, rng, exclude=tr_idx)
     tr_x, tr_y = imgs[tr_idx], lbls[tr_idx]
     te_x, te_y = imgs[te_idx], lbls[te_idx]
-    print(f"[train] n_exc={a.n_exc} train={len(tr_x)} test={len(te_x)} "
-          f"epochs={a.epochs} T={a.T}")
+    print(
+        f"[train] n_exc={a.n_exc} train={len(tr_x)} test={len(te_x)} "
+        f"epochs={a.epochs} T={a.T}"
+    )
 
     net = Network(784, a.n_exc, rng=rng)
 
@@ -143,7 +161,9 @@ def main():
     plot_confusion(cm, acc, os.path.join(OUT, f"{a.tag}_confusion.png"))
     plot_receptive_fields(net, os.path.join(OUT, f"{a.tag}_receptive_fields.png"))
     net.save(os.path.join(OUT, f"{a.tag}_net.npz"))
-    print(f"[result] wrote {a.tag}_confusion.png, {a.tag}_receptive_fields.png, {a.tag}_net.npz")
+    print(
+        f"[result] wrote {a.tag}_confusion.png, {a.tag}_receptive_fields.png, {a.tag}_net.npz"
+    )
     return acc
 
 

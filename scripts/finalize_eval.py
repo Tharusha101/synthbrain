@@ -25,6 +25,7 @@ import time
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,7 +39,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, ROOT)
 from sweep_receptive_fields import load_split, draw_train, CLASSES  # noqa: E402
-from synthbrain.torch_snn import TorchSNN, default_device           # noqa: E402
+from synthbrain.torch_snn import TorchSNN, default_device  # noqa: E402
 
 OUT = os.path.join(ROOT, "outputs", "sweeps")
 SAMPLES = os.path.join(ROOT, "outputs", "samples")
@@ -50,18 +51,45 @@ CONF_PNG = os.path.join(SAMPLES, "confusion_matrix.png")
 SEEDS = [0, 1, 2, 3, 4]
 T = 350
 T_PROBE = 700
-RECIPE = dict(n_exc=800, n_per_class=450, epochs=8, a_plus=0.020, a_minus=0.012,
-              norm_target=90.0, w_inh=0.6, theta_plus=2.0, r_m=6.0,
-              input_norm_power=0.5, batch=128)
+RECIPE = dict(
+    n_exc=800,
+    n_per_class=450,
+    epochs=8,
+    a_plus=0.020,
+    a_minus=0.012,
+    norm_target=90.0,
+    w_inh=0.6,
+    theta_plus=2.0,
+    r_m=6.0,
+    input_norm_power=0.5,
+    batch=128,
+)
 
 
 def train_net(p, tr_x, n_input, device, seed):
-    net = TorchSNN(n_input=n_input, n_exc=p["n_exc"], input_norm_power=p["input_norm_power"],
-                   w_inh=p["w_inh"], a_plus=p["a_plus"], a_minus=p["a_minus"],
-                   norm_target=p["norm_target"], theta_plus=p["theta_plus"], r_m=p["r_m"],
-                   stdp_update="sequential", device=device, dtype=torch.float32, seed=seed)
-    net.train(tr_x, epochs=p["epochs"], T=T, batch_size=p["batch"], progress=False,
-              rng=np.random.default_rng(seed))
+    net = TorchSNN(
+        n_input=n_input,
+        n_exc=p["n_exc"],
+        input_norm_power=p["input_norm_power"],
+        w_inh=p["w_inh"],
+        a_plus=p["a_plus"],
+        a_minus=p["a_minus"],
+        norm_target=p["norm_target"],
+        theta_plus=p["theta_plus"],
+        r_m=p["r_m"],
+        stdp_update="sequential",
+        device=device,
+        dtype=torch.float32,
+        seed=seed,
+    )
+    net.train(
+        tr_x,
+        epochs=p["epochs"],
+        T=T,
+        batch_size=p["batch"],
+        progress=False,
+        rng=np.random.default_rng(seed),
+    )
     if device == "cuda":
         torch.cuda.synchronize()
     return net
@@ -82,15 +110,26 @@ def plot_confusion(cm, acc, path):
     cmn = cm / cm.sum(axis=1, keepdims=True).clip(min=1)
     fig, ax = plt.subplots(figsize=(6.2, 5.4))
     im = ax.imshow(cmn, cmap="Blues", vmin=0, vmax=1)
-    ax.set(xticks=range(n), yticks=range(n), xlabel="predicted digit",
-           ylabel="true digit",
-           title=f"Linear-probe confusion matrix (acc={acc:.3f})")
+    ax.set(
+        xticks=range(n),
+        yticks=range(n),
+        xlabel="predicted digit",
+        ylabel="true digit",
+        title=f"Linear-probe confusion matrix (acc={acc:.3f})",
+    )
     for i in range(n):
         for j in range(n):
             v = cm[i, j]
             if v:
-                ax.text(j, i, str(v), ha="center", va="center", fontsize=7,
-                        color="white" if cmn[i, j] > 0.5 else "#333")
+                ax.text(
+                    j,
+                    i,
+                    str(v),
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    color="white" if cmn[i, j] > 0.5 else "#333",
+                )
     fig.colorbar(im, ax=ax, fraction=0.046, label="row-normalized rate")
     fig.tight_layout()
     fig.savefig(path, dpi=140)
@@ -105,8 +144,10 @@ def main():
         RESULTS = os.path.join(OUT, "finalize_results_smoke.json")
 
     device = default_device()
-    print(f"[finalize] device={device}  seeds={SEEDS}  recipe n_exc={RECIPE['n_exc']} "
-          f"a_plus={RECIPE['a_plus']} theta_plus={RECIPE['theta_plus']}")
+    print(
+        f"[finalize] device={device}  seeds={SEEDS}  recipe n_exc={RECIPE['n_exc']} "
+        f"a_plus={RECIPE['a_plus']} theta_plus={RECIPE['theta_plus']}"
+    )
     pool_idx, imgs, lbls, te_x, te_y, _, shape = load_split()
     n_input = int(np.prod(shape))
     n_classes = len(CLASSES)
@@ -123,8 +164,9 @@ def main():
     for seed in SEEDS:
         if seed in done:
             continue
-        tr_x, tr_y = draw_train(pool_idx, imgs, lbls, RECIPE["n_per_class"],
-                                np.random.default_rng(seed))
+        tr_x, tr_y = draw_train(
+            pool_idx, imgs, lbls, RECIPE["n_per_class"], np.random.default_rng(seed)
+        )
         t0 = time.time()
         net = train_net(RECIPE, tr_x, n_input, device, seed)
         sec = time.time() - t0
@@ -133,24 +175,36 @@ def main():
         preds = probe_predict(net, tr_x, tr_y, te_x, T_PROBE)
         probe = float((preds == np.asarray(te_y)).mean())
         results.append({"seed": seed, "native": native, "probe": probe, "sec": sec})
-        print(f"[finalize] seed={seed}  native={native:.3f}  probe={probe:.3f}  ({sec:.0f}s)")
+        print(
+            f"[finalize] seed={seed}  native={native:.3f}  probe={probe:.3f}  ({sec:.0f}s)"
+        )
         with open(RESULTS, "w") as fh:
             json.dump(results, fh, indent=2)
-        if seed == SEEDS[0]:   # confusion matrix from the first seed's probe
-            cm_payload = (confusion_matrix(np.asarray(te_y), preds,
-                                           labels=list(range(n_classes))), probe)
+        if seed == SEEDS[0]:  # confusion matrix from the first seed's probe
+            cm_payload = (
+                confusion_matrix(
+                    np.asarray(te_y), preds, labels=list(range(n_classes))
+                ),
+                probe,
+            )
 
     natives = np.array([r["native"] for r in results])
     probes = np.array([r["probe"] for r in results])
     summary = {
-        "native_mean": float(natives.mean()), "native_std": float(natives.std()),
-        "probe_mean": float(probes.mean()), "probe_std": float(probes.std()),
+        "native_mean": float(natives.mean()),
+        "native_std": float(natives.std()),
+        "probe_mean": float(probes.mean()),
+        "probe_std": float(probes.std()),
         "n_seeds": len(results),
     }
     print("\n=== multi-seed summary ===")
-    print(f"native readout: {summary['native_mean']:.3f} +/- {summary['native_std']:.3f}")
-    print(f"linear probe  : {summary['probe_mean']:.3f} +/- {summary['probe_std']:.3f}  "
-          f"(n={summary['n_seeds']} seeds, chance=0.10)")
+    print(
+        f"native readout: {summary['native_mean']:.3f} +/- {summary['native_std']:.3f}"
+    )
+    print(
+        f"linear probe  : {summary['probe_mean']:.3f} +/- {summary['probe_std']:.3f}  "
+        f"(n={summary['n_seeds']} seeds, chance=0.10)"
+    )
 
     if cm_payload is not None:
         plot_confusion(cm_payload[0], cm_payload[1], CONF_PNG)

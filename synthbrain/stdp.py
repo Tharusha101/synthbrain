@@ -28,10 +28,10 @@ class STDP:
         self,
         n_pre: int,
         n_post: int,
-        tau_pre: float = 20.0,    # ms, presynaptic trace time constant
-        tau_post: float = 20.0,   # ms, postsynaptic trace time constant
-        a_plus: float = 0.01,     # LTP learning rate (pre-before-post)
-        a_minus: float = 0.012,   # LTD learning rate (post-before-pre)
+        tau_pre: float = 20.0,  # ms, presynaptic trace time constant
+        tau_post: float = 20.0,  # ms, postsynaptic trace time constant
+        a_plus: float = 0.01,  # LTP learning rate (pre-before-post)
+        a_minus: float = 0.012,  # LTD learning rate (post-before-pre)
         w_min: float = 0.0,
         w_max: float = 1.0,
         dt: float = 1.0,
@@ -53,7 +53,9 @@ class STDP:
         self.x_pre[:] = 0.0
         self.x_post[:] = 0.0
 
-    def step(self, W: np.ndarray, pre_spikes: np.ndarray, post_spikes: np.ndarray) -> np.ndarray:
+    def step(
+        self, W: np.ndarray, pre_spikes: np.ndarray, post_spikes: np.ndarray
+    ) -> np.ndarray:
         """Apply one STDP update to W in place and return it.
 
         pre_spikes:  boolean (n_pre,);  post_spikes: boolean (n_post,).
@@ -66,9 +68,9 @@ class STDP:
         #    (i.e. the partner's most recent activity).
         pre_any = pre_spikes.any()
         post_any = post_spikes.any()
-        if pre_any:                                # LTD: post fired before this pre
+        if pre_any:  # LTD: post fired before this pre
             W[pre_spikes] -= self.a_minus * self.x_post[None, :]
-        if post_any:                               # LTP: pre fired before this post
+        if post_any:  # LTP: pre fired before this post
             W[:, post_spikes] += self.a_plus * self.x_pre[:, None]
 
         # 3. Register this step's spikes in the traces (for future pairings).

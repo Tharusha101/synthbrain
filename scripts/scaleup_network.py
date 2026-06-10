@@ -18,6 +18,7 @@ import sys
 import time
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,15 +27,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from synthbrain.network import Network
 from synthbrain import encoding
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs"
+)
 os.makedirs(OUT, exist_ok=True)
 
 # -- scale-up knobs (tweak here) --------------------------------------------
-CLASSES = list(range(10))   # all digits
-N_PER_CLASS = 150           # images per class (train+test pool)
-N_EXC = 400                 # excitatory neurons
+CLASSES = list(range(10))  # all digits
+N_PER_CLASS = 150  # images per class (train+test pool)
+N_EXC = 400  # excitatory neurons
 EPOCHS = 4
-T = 350                     # ms per image (the Network default; > the 150 demo)
+T = 350  # ms per image (the Network default; > the 150 demo)
 # Soften per-image input gain (1.0 = full normalization). <1 stops thin digits
 # like '1' from over-firing and monopolizing the excitatory layer.
 INPUT_NORM_POWER = 0.5
@@ -68,13 +71,23 @@ def get_data(rng):
         imgs, lbls = imgs[sel], lbls[sel]
         source = "MNIST"
     except Exception as e:
-        print(f"[data] MNIST unavailable ({e.__class__.__name__}); using synthetic digits.")
-        imgs, lbls = encoding.synthetic_digits(n_per_class=N_PER_CLASS, classes=CLASSES, rng=rng)
+        print(
+            f"[data] MNIST unavailable ({e.__class__.__name__}); using synthetic digits."
+        )
+        imgs, lbls = encoding.synthetic_digits(
+            n_per_class=N_PER_CLASS, classes=CLASSES, rng=rng
+        )
         source = "synthetic"
 
     n_train = int(0.75 * len(imgs))
-    return (imgs[:n_train], lbls[:n_train], imgs[n_train:], lbls[n_train:],
-            imgs.shape[1:], source)
+    return (
+        imgs[:n_train],
+        lbls[:n_train],
+        imgs[n_train:],
+        lbls[n_train:],
+        imgs.shape[1:],
+        source,
+    )
 
 
 def plot_receptive_fields(net, shape, n_show=64):
@@ -89,7 +102,9 @@ def plot_receptive_fields(net, shape, n_show=64):
             if net.neuron_labels is not None:
                 ax.set_title(str(net.neuron_labels[i]), fontsize=7, pad=1)
         ax.axis("off")
-    fig.suptitle(f"Learned receptive fields (sample of {n_show}/{net.n_exc})", fontsize=12)
+    fig.suptitle(
+        f"Learned receptive fields (sample of {n_show}/{net.n_exc})", fontsize=12
+    )
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, "scaleup_receptive_fields.png"), dpi=130)
     plt.close(fig)
@@ -100,8 +115,11 @@ def plot_raster(net, image, T):
     ts, ns = np.where(trace)
     fig, ax = plt.subplots(figsize=(8, 3.5))
     ax.scatter(ts, ns, s=5, color="#1a202c")
-    ax.set(xlabel="time (ms)", ylabel="excitatory neuron",
-           title="Excitatory spike raster (one test image)")
+    ax.set(
+        xlabel="time (ms)",
+        ylabel="excitatory neuron",
+        title="Excitatory spike raster (one test image)",
+    )
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, "scaleup_raster.png"), dpi=130)
     plt.close(fig)
@@ -118,7 +136,9 @@ def per_class_report(net, te_x, te_y, n_classes):
     for c in range(n_classes):
         mask = labels == c
         recall = (preds[mask] == c).mean() if mask.any() else float("nan")
-        print(f"  digit {c}: {coverage[c]:3d} neurons   recall={recall:.2f}  (n={int(mask.sum())})")
+        print(
+            f"  digit {c}: {coverage[c]:3d} neurons   recall={recall:.2f}  (n={int(mask.sum())})"
+        )
     return preds
 
 
@@ -128,14 +148,23 @@ def main():
     n_input = int(np.prod(shape))
     n_classes = len(np.unique(np.concatenate([tr_y, te_y])))
 
-    print(f"[scaleup] source={source}  train={len(tr_x)}  test={len(te_x)}  "
-          f"input={n_input}  classes={n_classes}  n_exc={N_EXC}  epochs={EPOCHS}  T={T}  "
-          f"input_norm_power={INPUT_NORM_POWER}  inhibition={INHIBITION}  w_inh={W_INH}  "
-          f"a_plus={A_PLUS}  theta_plus={THETA_PLUS}")
+    print(
+        f"[scaleup] source={source}  train={len(tr_x)}  test={len(te_x)}  "
+        f"input={n_input}  classes={n_classes}  n_exc={N_EXC}  epochs={EPOCHS}  T={T}  "
+        f"input_norm_power={INPUT_NORM_POWER}  inhibition={INHIBITION}  w_inh={W_INH}  "
+        f"a_plus={A_PLUS}  theta_plus={THETA_PLUS}"
+    )
 
-    net = Network(n_input=n_input, n_exc=N_EXC, input_norm_power=INPUT_NORM_POWER,
-                  inhibition=INHIBITION, w_inh=W_INH, a_plus=A_PLUS,
-                  theta_plus=THETA_PLUS, rng=rng)
+    net = Network(
+        n_input=n_input,
+        n_exc=N_EXC,
+        input_norm_power=INPUT_NORM_POWER,
+        inhibition=INHIBITION,
+        w_inh=W_INH,
+        a_plus=A_PLUS,
+        theta_plus=THETA_PLUS,
+        rng=rng,
+    )
 
     t0 = time.time()
     net.train(tr_x, epochs=EPOCHS, T=T, progress=True)

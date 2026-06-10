@@ -56,8 +56,8 @@ def test_stdp_sign_and_magnitude():
             stdp.step(W, np.array([ti == 50]), np.array([ti == 50 + delta_t]))
         return W[0, 0] - 0.5
 
-    assert dw(1) > 0           # pre-before-post potentiates
-    assert dw(-1) < 0          # post-before-pre depresses
+    assert dw(1) > 0  # pre-before-post potentiates
+    assert dw(-1) < 0  # post-before-pre depresses
     assert dw(0) == 0.0
     assert dw(1) > dw(20) > 0  # exponential fall-off
 

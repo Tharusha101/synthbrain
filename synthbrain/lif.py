@@ -31,15 +31,15 @@ class LIFGroup:
     def __init__(
         self,
         n: int,
-        dt: float = 1.0,          # ms, simulation timestep
-        tau_m: float = 20.0,      # ms, membrane time constant
-        v_rest: float = -65.0,    # mV, resting potential
-        v_reset: float = -65.0,   # mV, reset potential after spike
+        dt: float = 1.0,  # ms, simulation timestep
+        tau_m: float = 20.0,  # ms, membrane time constant
+        v_rest: float = -65.0,  # mV, resting potential
+        v_reset: float = -65.0,  # mV, reset potential after spike
         v_thresh: float = -52.0,  # mV, firing threshold (baseline)
-        r_m: float = 1.0,         # MOhm, membrane resistance (scales input current)
-        t_refrac: float = 2.0,    # ms, absolute refractory period
+        r_m: float = 1.0,  # MOhm, membrane resistance (scales input current)
+        t_refrac: float = 2.0,  # ms, absolute refractory period
         theta_plus: float = 0.0,  # mV, threshold bump per spike (0 -> adaptation off)
-        tau_theta: float = 1e7,   # ms, threshold-offset decay time constant
+        tau_theta: float = 1e7,  # ms, threshold-offset decay time constant
         rng: np.random.Generator | None = None,
     ):
         self.n = n
@@ -57,8 +57,10 @@ class LIFGroup:
 
         # State
         self.v = np.full(n, v_rest, dtype=np.float64)
-        self.refrac_until = np.zeros(n, dtype=np.float64)  # time (ms) until neuron can fire again
-        self.theta = np.zeros(n, dtype=np.float64)         # adaptive threshold offset (mV)
+        self.refrac_until = np.zeros(
+            n, dtype=np.float64
+        )  # time (ms) until neuron can fire again
+        self.theta = np.zeros(n, dtype=np.float64)  # adaptive threshold offset (mV)
         self.t = 0.0
 
     def reset_state(self):

@@ -26,6 +26,7 @@ import time
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,7 +36,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from synthbrain.torch_snn import TorchSNN, default_device
 from synthbrain import encoding
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs"
+)
 os.makedirs(OUT, exist_ok=True)
 
 # -- WINNING RECIPE (from scripts/sweep_receptive_fields.py; see CLAUDE.md) --
@@ -47,16 +50,16 @@ os.makedirs(OUT, exist_ok=True)
 CLASSES = list(range(10))
 N_PER_CLASS = 450
 N_EXC = 800
-EPOCHS = 8                  # 800 exc x 4500 imgs x 8 ep ~= 27 min on the RTX 4060
+EPOCHS = 8  # 800 exc x 4500 imgs x 8 ep ~= 27 min on the RTX 4060
 T = 350
-BATCH_SIZE = 128            # 128-256 saturates the 4060; in "sequential" mode a bigger
-                            # batch only lengthens the frozen-W forward window. Drop if
-                            # accuracy slips, raise for speed.
+BATCH_SIZE = 128  # 128-256 saturates the 4060; in "sequential" mode a bigger
+# batch only lengthens the frozen-W forward window. Drop if
+# accuracy slips, raise for speed.
 INPUT_NORM_POWER = 0.5
-W_INH = 0.6                 # lateral inhibition strength (won vs two_layer)
-A_PLUS = 0.02               # LTP strength: THE template-cleanliness lever
-THETA_PLUS = 2.0            # adaptive-threshold homeostasis: cancels the dead-neuron
-                            # side-effect of strong LTP (saturates ~2.0; >2.5 over-regularizes)
+W_INH = 0.6  # lateral inhibition strength (won vs two_layer)
+A_PLUS = 0.02  # LTP strength: THE template-cleanliness lever
+THETA_PLUS = 2.0  # adaptive-threshold homeostasis: cancels the dead-neuron
+# side-effect of strong LTP (saturates ~2.0; >2.5 over-regularizes)
 STDP_UPDATE = "sequential"  # online-like mini-batch updates (vs faster "summed")
 
 # Override knobs from the environment (no edit needed), e.g.
@@ -77,12 +80,22 @@ def get_data(rng):
         imgs, lbls = imgs[sel], lbls[sel]
         source = "MNIST"
     except Exception as e:
-        print(f"[data] MNIST unavailable ({e.__class__.__name__}); using synthetic digits.")
-        imgs, lbls = encoding.synthetic_digits(n_per_class=N_PER_CLASS, classes=CLASSES, rng=rng)
+        print(
+            f"[data] MNIST unavailable ({e.__class__.__name__}); using synthetic digits."
+        )
+        imgs, lbls = encoding.synthetic_digits(
+            n_per_class=N_PER_CLASS, classes=CLASSES, rng=rng
+        )
         source = "synthetic"
     n_train = int(0.75 * len(imgs))
-    return (imgs[:n_train], lbls[:n_train], imgs[n_train:], lbls[n_train:],
-            imgs.shape[1:], source)
+    return (
+        imgs[:n_train],
+        lbls[:n_train],
+        imgs[n_train:],
+        lbls[n_train:],
+        imgs.shape[1:],
+        source,
+    )
 
 
 def plot_receptive_fields(net, shape, n_show=64):
@@ -97,7 +110,9 @@ def plot_receptive_fields(net, shape, n_show=64):
             if net.neuron_labels is not None:
                 ax.set_title(str(net.neuron_labels[i]), fontsize=7, pad=1)
         ax.axis("off")
-    fig.suptitle(f"GPU-trained receptive fields (sample of {n_show}/{net.n_exc})", fontsize=12)
+    fig.suptitle(
+        f"GPU-trained receptive fields (sample of {n_show}/{net.n_exc})", fontsize=12
+    )
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, "gpu_receptive_fields.png"), dpi=130)
     plt.close(fig)
@@ -111,7 +126,9 @@ def per_class_report(net, te_x, te_y, n_classes):
     for c in range(n_classes):
         mask = labels == c
         recall = (preds[mask] == c).mean() if mask.any() else float("nan")
-        print(f"  digit {c}: {coverage[c]:3d} neurons   recall={recall:.2f}  (n={int(mask.sum())})")
+        print(
+            f"  digit {c}: {coverage[c]:3d} neurons   recall={recall:.2f}  (n={int(mask.sum())})"
+        )
 
 
 def main():
@@ -124,21 +141,40 @@ def main():
     if device == "cuda":
         print(f"[gpu] CUDA device: {torch.cuda.get_device_name(0)}")
     else:
-        print("[gpu] WARNING: CUDA not available -- running on CPU (install a CUDA "
-              "torch build for GPU). Dynamics are identical; it will just be slower.")
+        print(
+            "[gpu] WARNING: CUDA not available -- running on CPU (install a CUDA "
+            "torch build for GPU). Dynamics are identical; it will just be slower."
+        )
 
-    print(f"[gpu] source={source}  train={len(tr_x)}  test={len(te_x)}  input={n_input}  "
-          f"classes={n_classes}  n_exc={N_EXC}  epochs={EPOCHS}  T={T}  batch={BATCH_SIZE}  "
-          f"input_norm_power={INPUT_NORM_POWER}  w_inh={W_INH}  a_plus={A_PLUS}  "
-          f"theta_plus={THETA_PLUS}  stdp_update={STDP_UPDATE}")
+    print(
+        f"[gpu] source={source}  train={len(tr_x)}  test={len(te_x)}  input={n_input}  "
+        f"classes={n_classes}  n_exc={N_EXC}  epochs={EPOCHS}  T={T}  batch={BATCH_SIZE}  "
+        f"input_norm_power={INPUT_NORM_POWER}  w_inh={W_INH}  a_plus={A_PLUS}  "
+        f"theta_plus={THETA_PLUS}  stdp_update={STDP_UPDATE}"
+    )
 
-    net = TorchSNN(n_input=n_input, n_exc=N_EXC, input_norm_power=INPUT_NORM_POWER,
-                   w_inh=W_INH, a_plus=A_PLUS, theta_plus=THETA_PLUS,
-                   stdp_update=STDP_UPDATE, device=device, dtype=torch.float32, seed=0)
+    net = TorchSNN(
+        n_input=n_input,
+        n_exc=N_EXC,
+        input_norm_power=INPUT_NORM_POWER,
+        w_inh=W_INH,
+        a_plus=A_PLUS,
+        theta_plus=THETA_PLUS,
+        stdp_update=STDP_UPDATE,
+        device=device,
+        dtype=torch.float32,
+        seed=0,
+    )
 
     t0 = time.time()
-    net.train(tr_x, epochs=EPOCHS, T=T, batch_size=BATCH_SIZE, progress=True,
-              rng=np.random.default_rng(0))
+    net.train(
+        tr_x,
+        epochs=EPOCHS,
+        T=T,
+        batch_size=BATCH_SIZE,
+        progress=True,
+        rng=np.random.default_rng(0),
+    )
     if device == "cuda":
         torch.cuda.synchronize()
     print(f"[gpu] trained in {time.time() - t0:.1f}s")
@@ -149,8 +185,10 @@ def main():
     # Native mean-count readout undersells selective neurons; the linear probe is
     # the representation's true accuracy (the headline number). See CLAUDE.md.
     probe = net.linear_probe(tr_x, tr_y, te_x, te_y, T=T)
-    print(f"[gpu] native readout = {acc:.3f}   linear-probe = {probe:.3f}   "
-          f"(chance = {chance:.3f})")
+    print(
+        f"[gpu] native readout = {acc:.3f}   linear-probe = {probe:.3f}   "
+        f"(chance = {chance:.3f})"
+    )
 
     per_class_report(net, te_x, te_y, n_classes)
     plot_receptive_fields(net, shape)

@@ -29,8 +29,8 @@ class Synapses:
         n_pre: int,
         n_post: int,
         w: np.ndarray | None = None,
-        tau_syn: float = 5.0,   # ms, synaptic current decay
-        dt: float = 1.0,        # ms, must match the post group's dt
+        tau_syn: float = 5.0,  # ms, synaptic current decay
+        dt: float = 1.0,  # ms, must match the post group's dt
     ):
         self.n_pre = n_pre
         self.n_post = n_post

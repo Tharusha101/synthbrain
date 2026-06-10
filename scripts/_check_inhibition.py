@@ -35,7 +35,9 @@ N_IMG = 5
 
 def summarize(imgs, **net_kwargs):
     rng = np.random.default_rng(0)
-    net = Network(n_input=imgs.shape[1] * imgs.shape[2], n_exc=N_EXC, rng=rng, **net_kwargs)
+    net = Network(
+        n_input=imgs.shape[1] * imgs.shape[2], n_exc=N_EXC, rng=rng, **net_kwargs
+    )
     exc_tot, exc_active, inh_tot, top_share = [], [], [], []
     for img in imgs:
         out = net.simulate(img, T=T)
@@ -62,15 +64,29 @@ def main():
     print(f"Untrained networks, {N_IMG} images, T={T}, n_exc={N_EXC}\n")
     configs = [
         ("lateral w_inh=0.6 (baseline)", dict(inhibition="lateral", w_inh=0.6)),
-        ("two_layer w_ei=40 w_inh=0.3", dict(inhibition="two_layer", w_exc_inh=40, w_inh=0.3)),
-        ("two_layer w_ei=40 w_inh=0.4", dict(inhibition="two_layer", w_exc_inh=40, w_inh=0.4)),
-        ("two_layer w_ei=40 w_inh=0.6", dict(inhibition="two_layer", w_exc_inh=40, w_inh=0.6)),
-        ("two_layer w_ei=40 w_inh=3.0", dict(inhibition="two_layer", w_exc_inh=40, w_inh=3.0)),
+        (
+            "two_layer w_ei=40 w_inh=0.3",
+            dict(inhibition="two_layer", w_exc_inh=40, w_inh=0.3),
+        ),
+        (
+            "two_layer w_ei=40 w_inh=0.4",
+            dict(inhibition="two_layer", w_exc_inh=40, w_inh=0.4),
+        ),
+        (
+            "two_layer w_ei=40 w_inh=0.6",
+            dict(inhibition="two_layer", w_exc_inh=40, w_inh=0.6),
+        ),
+        (
+            "two_layer w_ei=40 w_inh=3.0",
+            dict(inhibition="two_layer", w_exc_inh=40, w_inh=3.0),
+        ),
     ]
     for name, kw in configs:
         s = summarize(imgs, **kw)
-        print(f"{name:32s}  exc={s['exc_spikes/img']:7.1f}  active={s['exc_active/img']:5.1f}/100"
-              f"  inh={s['inh_spikes/img']:7.1f}  top10={s['top10_share']:.2f}")
+        print(
+            f"{name:32s}  exc={s['exc_spikes/img']:7.1f}  active={s['exc_active/img']:5.1f}/100"
+            f"  inh={s['inh_spikes/img']:7.1f}  top10={s['top10_share']:.2f}"
+        )
 
 
 if __name__ == "__main__":

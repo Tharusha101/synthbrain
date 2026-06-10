@@ -12,6 +12,7 @@ import sys
 import time
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +21,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from synthbrain.network import Network
 from synthbrain import encoding
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs"
+)
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -35,13 +38,21 @@ def get_data(rng):
         imgs, lbls = imgs[sel], lbls[sel]
         source = "MNIST"
     except Exception as e:
-        print(f"[data] MNIST unavailable ({e.__class__.__name__}); using synthetic digits.")
+        print(
+            f"[data] MNIST unavailable ({e.__class__.__name__}); using synthetic digits."
+        )
         imgs, lbls = encoding.synthetic_digits(n_per_class=40, classes=classes, rng=rng)
         source = "synthetic"
 
     n_train = int(0.75 * len(imgs))
-    return (imgs[:n_train], lbls[:n_train], imgs[n_train:], lbls[n_train:],
-            imgs.shape[1:], source)
+    return (
+        imgs[:n_train],
+        lbls[:n_train],
+        imgs[n_train:],
+        lbls[n_train:],
+        imgs.shape[1:],
+        source,
+    )
 
 
 def plot_receptive_fields(net, shape, n_show=16):
@@ -67,8 +78,11 @@ def plot_raster(net, image, T):
     ts, ns = np.where(trace)
     fig, ax = plt.subplots(figsize=(8, 3.5))
     ax.scatter(ts, ns, s=6, color="#1a202c")
-    ax.set(xlabel="time (ms)", ylabel="excitatory neuron",
-           title="Excitatory spike raster (one test image)")
+    ax.set(
+        xlabel="time (ms)",
+        ylabel="excitatory neuron",
+        title="Excitatory spike raster (one test image)",
+    )
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, "net_raster.png"), dpi=130)
     plt.close(fig)
@@ -81,8 +95,10 @@ def main():
     n_classes = len(np.unique(np.concatenate([tr_y, te_y])))
     T = 150  # ms per image — short for a quick demo
 
-    print(f"[demo] source={source}  train={len(tr_x)}  test={len(te_x)}  "
-          f"input={n_input}  classes={n_classes}")
+    print(
+        f"[demo] source={source}  train={len(tr_x)}  test={len(te_x)}  "
+        f"input={n_input}  classes={n_classes}"
+    )
 
     # Defaults (r_m=6, norm_target=90, w_inh=0.6) put the excitatory cells in a
     # healthy firing regime that learns from a cold start; see scripts/_sweep.py

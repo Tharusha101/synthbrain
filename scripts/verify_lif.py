@@ -4,6 +4,7 @@ import os
 import sys
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,9 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from synthbrain.lif import LIFGroup
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs"
+)
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -45,9 +48,9 @@ def fi_curve():
     T = int(1000 / dt)
     currents_levels = np.linspace(0, 40, 25)
     rates = []
-    for I in currents_levels:
+    for current in currents_levels:
         g = LIFGroup(1, dt=dt)
-        _, spikes = g.run(np.full((T, 1), I))
+        _, spikes = g.run(np.full((T, 1), current))
         rates.append(spikes.sum() / (T * dt) * 1000.0)  # Hz
     rates = np.array(rates)
 
@@ -60,7 +63,9 @@ def fi_curve():
 
     rheobase = currents_levels[np.argmax(rates > 0)]
     monotonic = np.all(np.diff(rates) >= -1e-9)
-    print(f"[fi_curve] rheobase ~ {rheobase:.1f}, monotonic: {monotonic}, max rate {rates.max():.0f} Hz")
+    print(
+        f"[fi_curve] rheobase ~ {rheobase:.1f}, monotonic: {monotonic}, max rate {rates.max():.0f} Hz"
+    )
     return monotonic, rates
 
 
@@ -72,7 +77,9 @@ def checks():
     assert sp.sum() == 0, "neuron spiked under subthreshold current"
     mono, rates = fi_curve()
     assert mono, "F-I curve not monotonic"
-    assert rates[-1] > rates[len(rates) // 2], "firing rate did not increase with current"
+    assert (
+        rates[-1] > rates[len(rates) // 2]
+    ), "firing rate did not increase with current"
     print("\nAll LIF checks passed.")
 
 
