@@ -3,6 +3,9 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
+# Local Claude Code project context — kept on disk, not published.
+CLAUDE.md
+
 # Generated plots (keep the folder, ignore its contents except curated samples).
 outputs/*
 !outputs/.gitkeep
