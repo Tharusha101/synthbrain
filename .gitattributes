@@ -1,0 +1,22 @@
+# Normalize line endings: store LF in the repo, check out native per OS
+# (CRLF on Windows, LF on macOS/Linux). Fixes files rendering as one long line.
+* text=auto
+
+# Explicit handling for the text types in this repo.
+*.py    text
+*.md    text
+*.txt   text
+*.toml  text
+*.yml   text
+*.yaml  text
+*.json  text
+*.cfg   text
+*.ini   text
+*.gitignore text
+
+# Binary artifacts — never apply line-ending conversion.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.npz   binary
