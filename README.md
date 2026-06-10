@@ -3,10 +3,15 @@
 **A spiking neural network that learns to read MNIST digits — with no backpropagation, built from scratch in NumPy.**
 
 Real-style neurons (leaky integrate-and-fire) wired randomly, learning purely
-from the *timing* of their spikes (STDP). No gradients, no loss function, no
-labels during training. The network discovers clean, human-readable digit
-templates on its own — and a simple linear readout then classifies them at
-**90% accuracy** (vs. 10% chance).
+from the *timing* of their spikes (STDP). No gradients, no loss function, and
+**no labels during training** — the network discovers clean, human-readable
+digit templates entirely on its own.
+
+To *measure* what it learned, a supervised **linear probe** (logistic regression
+on the frozen spike counts) reaches **~90% MNIST accuracy**. The network's own
+fully-unsupervised **native readout** reaches **~60%** (vs. 10% chance). The
+SNN's weights are never touched by a gradient — the probe is just a ruler held up
+to the learned representation.
 
 <p align="center">
   <img src="outputs/samples/spike_animation_clean.gif" width="640" alt="Live spike raster: input retina, excitatory neurons coloured by the digit each one learned, and a running prediction.">
@@ -34,6 +39,17 @@ templates on its own — and a simple linear readout then classifies them at
   (`tmpl_match`) is **0.89** — up from **−0.13** at baseline. Zero dead neurons.
 - **Robust, not a lucky seed.** Retrained across 5 RNG seeds (weight init,
   Poisson noise, batch order all varied): 0.900 ± 0.007.
+
+> **What the numbers mean — read this before quoting the 90%.**
+> - STDP training is **fully unsupervised**; it never sees labels.
+> - Labels are used **only at evaluation**, two ways:
+>   1. **Native readout** — assign each neuron to the class it fires most for, then
+>      vote. This is the unsupervised score: **~60%**.
+>   2. **Linear probe** — a *supervised* logistic regression fit on the **frozen**
+>      spike counts (the SNN's weights stay fixed): **~90%**.
+> - So the **90% headline is the supervised linear probe**, not the SNN
+>   classifying at 90% unsupervised. The probe measures how linearly-decodable the
+>   learned representation is; it adds one trained layer on top of frozen features.
 
 ### Receptive fields: noise → clean digits
 
@@ -151,21 +167,27 @@ synthbrain/
   synthbrain/            # the package (pure-NumPy core)
     lif.py              # LIF neuron layer (+ adaptive threshold)
     synapses.py         # weights + exponential synaptic current
-    encoding.py         # Poisson encoding + MNIST loader
+    encoding.py         # Poisson encoding + MNIST loader (offline fallback)
     stdp.py             # pair-based STDP learning rule
     network.py          # full SNN: input → exc, inhibition, readout
     torch_snn.py        # batched GPU port (CUDA) + linear_probe()
   scripts/
-    verify_*.py         # per-component correctness checks (with plots)
+    reproduce_tiny.py   # fast offline smoke run (<2 min, proves it works)
     demo_network.py     # 4-class CPU demo: train → label → accuracy
     scaleup_network.py  # 10-class CPU run (NumPy)
     train_gpu.py        # 10-class GPU run with the winning recipe
+    finalize_eval.py    # multi-seed robustness + confusion matrix
     sweep_receptive_fields.py  # hyperparameter sweep + cleanliness metrics
     readout_experiment.py      # native vs. linear-probe readout
-    finalize_eval.py    # multi-seed robustness + confusion matrix
     animate_network.py  # the live spike-raster GIF
-  tests/test_core.py    # fast, plot-free pytest for every building block
-  outputs/samples/      # saved figures, GIF, best model, metrics JSON
+    verify_*.py         # per-component correctness checks (with plots)
+  tests/
+    test_core.py        # building-block unit tests (LIF, synapses, STDP, encoding)
+    test_network.py     # Network readout API + save/load round-trip
+    test_torch_snn.py   # TorchSNN forward pass (skipped if torch absent)
+  outputs/samples/      # curated figures, GIF, best model, metrics JSON
+  pyproject.toml        # installable package + dev / mnist / probe extras
+  .github/workflows/    # CI: pytest + ruff on every push and PR
 ```
 
 The winning configuration is documented in detail in
@@ -174,30 +196,45 @@ saved model is `outputs/samples/gpu_best_net.npz`.
 
 ---
 
-## Run it yourself
+## Install
 
 ```bash
-pip install -r requirements.txt          # numpy + matplotlib (core)
-# optional, for the MNIST fetch + linear probe:
-#   pip install torchvision scikit-learn
+# core only (the from-scratch NumPy SNN):
+pip install -e .
+
+# everything (GPU port, MNIST loader, linear probe, dev tools):
+pip install -e ".[dev,mnist,probe]"
 ```
 
+## Quickstart
+
+The first commands need **no GPU and no dataset download**:
+
 ```bash
-# CPU, no GPU needed — trains 10 digits and reports accuracy (~3-4 min):
+# 1. smoke test — every building block passes (seconds):
+pytest -q
+
+# 2. tiny end-to-end run — trains a small SNN on offline synthetic digits,
+#    prints the spike-count shape + accuracy, writes a receptive-field PNG (<2 min):
+python scripts/reproduce_tiny.py
+
+# 3. small MNIST demo — 4 digits on CPU (falls back to synthetic data offline):
+python scripts/demo_network.py
+```
+
+## Full reproduction
+
+```bash
+# Full 10-class CPU run (NumPy, ~3-4 min):
 python scripts/scaleup_network.py
 
-# Verify any building block in isolation (each writes a plot):
-python scripts/verify_stdp.py            # reproduces the STDP window
-python scripts/verify_lif.py             # F-I curve, refractory reset
+# Full winning recipe on GPU — 800 neurons, 36k presentations, ~20 min on an
+# RTX 4060 — reproduces the 0.91 linear-probe result:
+python scripts/train_gpu.py
 
-# Run the test suite:
-pytest tests/test_core.py
+# Multi-seed robustness + confusion matrix (the 0.900 ± 0.007 figure):
+python scripts/finalize_eval.py
 ```
-
-The full winning recipe (800 neurons, 36k presentations, linear probe) runs on
-GPU via `scripts/train_gpu.py` (~20 min on an RTX 4060). It reproduces the
-0.91 result; the multi-seed robustness numbers come from
-`scripts/finalize_eval.py`.
 
 > **Windows note:** torchvision's MNIST loader clashes with Anaconda's MKL
 > OpenMP. If you hit `OMP: Error #15`, set `KMP_DUPLICATE_LIB_OK=TRUE` for that
@@ -208,11 +245,13 @@ GPU via `scripts/train_gpu.py` (~20 min on an RTX 4060). It reproduces the
 ## Honest caveats
 
 - **It's not state-of-the-art MNIST** (a tiny CNN with backprop gets ~99%). The
-  point isn't the score — it's that **90% emerges from local, biologically
-  plausible learning rules with no gradient signal at all.**
-- The linear probe *is* supervised, but it only reads out a representation that
-  was learned entirely unsupervised; the SNN's weights are frozen when the probe
-  is fit.
+  point isn't the score — it's that a representation good enough for a linear
+  probe to reach **~90%** emerged from local, biologically plausible learning
+  rules with **no gradient signal at all**.
+- **The 90% is a *supervised* linear probe**, not unsupervised classification.
+  The probe fits logistic regression on the frozen spike counts; the SNN's
+  weights are never updated by it. The fully-unsupervised native readout is
+  **~60%**.
 - Single-machine scale. Pushing past 800 neurons would need a larger data budget
   than tested here.
 
